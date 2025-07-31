@@ -1,0 +1,31 @@
+import { Injectable } from '@nestjs/common';
+import { getByValue } from '../utils/map.utils';
+
+@Injectable()
+export class SocketStore {
+  private store: Map<string, any> = new Map();
+  private userSocketStore: Map<string, string> = new Map();
+
+  add(userId, socketId, socket) {
+    this.userSocketStore.set(userId, socketId);
+    this.store.set(socketId, socket);
+  }
+
+  getFromUser(userId) {
+    return this.get(this.userSocketStore.get(userId));
+  }
+
+  get(socketId) {
+    return this.store.get(socketId);
+  }
+
+  // For Test
+  getAll() {
+    return Array.from(this.store.keys());
+  }
+
+  remove(socketId) {
+    this.userSocketStore.delete(getByValue(this.userSocketStore, socketId));
+    this.store.delete(socketId);
+  }
+}
