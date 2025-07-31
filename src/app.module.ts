@@ -4,12 +4,18 @@ import { AppService } from './app.service';
 import { ConversationsModule } from './conversations/conversations.module';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { MessagesModule } from './messages/messages.module';
+import { UsersModule } from './users/users.module';
+import { ConvPartModule } from './conversation-participant/conversation-participant.module';
 
 @Module({
   imports: [
     ConversationsModule,
     ConfigModule.forRoot({ isGlobal: true }),
     MongooseModule.forRoot(process.env.DATABASE_URL!),
+    MessagesModule,
+    UsersModule,
+    ConvPartModule,
   ],
   controllers: [AppController],
   providers: [AppService],
