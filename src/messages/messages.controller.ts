@@ -19,12 +19,23 @@ export class MessagesController {
   constructor(private readonly messagesService: MessageService) { }
 
   @Post()
-  async create(@Body() body: unknown): Promise<{ message: string; data: any }> {
+  async create(
+    @Body()
+    body: {
+      senderId: string;
+      recieverId: string;
+      content: string;
+      conversation: string;
+      messageStatus?: string;
+    },
+  ): Promise<{ message: string; data: any }> {
     const data = createMessageValidator.safeParse(body);
+    console.log(body);
+
     if (!data.success) {
       throw new BadRequestException(data.error.format());
     }
-    const createdMessage = await this.messagesService.save(data.data);
+    const createdMessage = await this.messagesService.createMessage(body);
     return {
       message: 'Message created successfully',
       data: createdMessage,

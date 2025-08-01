@@ -9,20 +9,22 @@ export enum MessageStatus {
 
 export type MessageDocument = Message & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Message {
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'conversations' }] })
-  conversation: Types.ObjectId[];
+  @Prop({ type: Types.ObjectId, ref: 'Conversation', required: true })
+  conversation: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  sender: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  reciever: Types.ObjectId;
 
   @Prop({ required: true })
-  message: string;
+  content: string;
 
-  @Prop({
-    type: String,
-    enum: MessageStatus,
-    required: true,
-  })
-  status: MessageStatus;
+  @Prop({ required: true, enum: MessageStatus })
+  messageStatus: MessageStatus;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
