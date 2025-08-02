@@ -15,4 +15,4 @@ import { DatabaseService } from 'src/database/database.service';
   providers: [DatabaseService, ConversationsService],
   exports: [MongooseModule],
 })
-export class ConversationsModule { }
+export class ConversationsModule {}

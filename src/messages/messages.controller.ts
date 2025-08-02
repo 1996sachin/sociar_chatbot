@@ -12,11 +12,12 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 
 @Controller('messages')
 export class MessagesController {
-  constructor(private readonly messagesService: MessageService) { }
+  constructor(private readonly messagesService: MessageService) {}
 
   @Post()
   async create(
@@ -42,11 +43,14 @@ export class MessagesController {
     };
   }
 
-  @Get()
-  findAll() {
-    return this.messagesService.all();
+  @Get(':conversationId')
+  findAll(
+    @Param('conversationId') conversationId: string,
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+  ) {
+    return this.messagesService.fetchMessages(page, limit, conversationId);
   }
-
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.messagesService.find(id);
