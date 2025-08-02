@@ -1,10 +1,10 @@
 import {
-  BadRequestException,
   Body,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/base.service';
 import { MessageDocument, Message } from './entities/message.entity';
 import { InjectModel } from '@nestjs/mongoose';
@@ -84,7 +84,31 @@ export class MessageService extends BaseService<MessageDocument> {
       };
     } catch (error) {
       if (error instanceof Error) {
-        throw new BadRequestException(error.message);
+        throw new InternalServerErrorException(error.message);
+      }
+    }
+  }
+
+  async fetchMessages(page: string, limit: string, conversationId: string) {
+    try {
+      const pageNum = parseInt(page, 10) || 10;
+      const limitNum = parseInt(limit, 10) || 10;
+      const offset = (pageNum - 1) * limitNum;
+
+      const data = await this.MessageModel.find({
+        conversation: new Types.ObjectId(conversationId),
+      })
+        .skip(offset)
+        .limit(limitNum)
+        .exec();
+
+      return {
+        message: 'Messages fetched',
+        data,
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new InternalServerErrorException(error.message);
       }
     }
   }

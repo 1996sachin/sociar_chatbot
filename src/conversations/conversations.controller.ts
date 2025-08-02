@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { ConversationsService } from './conversations.service';
 import {
@@ -16,7 +17,7 @@ import {
 
 @Controller('conversations')
 export class ConversationsController {
-  constructor(private readonly conversationsService: ConversationsService) { }
+  constructor(private readonly conversationsService: ConversationsService) {}
 
   @Post()
   async create(@Body() body: unknown): Promise<{ message: string; data: any }> {
@@ -34,8 +35,8 @@ export class ConversationsController {
   }
 
   @Get()
-  findAll() {
-    return this.conversationsService.all();
+  findAll(@Query('page') page: string, @Query('limit') limit: string) {
+    return this.conversationsService.fetchConversations(page, limit);
   }
 
   @Get(':id')
