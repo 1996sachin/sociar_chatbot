@@ -5,10 +5,10 @@ export type ConvPartDocument = ConvPart & Document;
 
 @Schema()
 export class ConvPart {
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'conversations' }] })
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Conversation' }] })
   conversation: Types.ObjectId;
 
-  @Prop({ type: [{ type: Types.ObjectId, ref: 'users' }] })
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }] })
   users: Types.ObjectId;
 }
 

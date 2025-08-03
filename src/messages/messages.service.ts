@@ -14,6 +14,10 @@ import {
   Conversation,
 } from 'src/conversations/entities/conversation.entity';
 import bcrypt from 'bcrypt';
+import {
+  ConvPart,
+  ConvPartDocument,
+} from 'src/conversation-participant/entities/conversation-participant.entity';
 
 @Injectable()
 export class MessageService extends BaseService<MessageDocument> {
@@ -23,6 +27,8 @@ export class MessageService extends BaseService<MessageDocument> {
     @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
     @InjectModel(Conversation.name)
     private readonly ConversationModel: Model<ChatDocument>,
+    @InjectModel(ConvPart.name)
+    private readonly ConvPartModel: Model<ConvPartDocument>,
   ) {
     super(MessageModel);
   }
@@ -41,11 +47,10 @@ export class MessageService extends BaseService<MessageDocument> {
       let { senderId, recieverId, content, conversationId, messageStatus } =
         body;
       const senderExists = await this.UserModel.findById(senderId);
+
       const recieverExists = await this.UserModel.findById(recieverId);
       const conversationExists =
         await this.ConversationModel.findById(conversationId);
-      console.log(conversationExists);
-      console.log(conversationId);
 
       if (!senderExists) {
         throw new NotFoundException('No such sender found');
@@ -64,10 +69,10 @@ export class MessageService extends BaseService<MessageDocument> {
       } else {
         conversationId = conversationExists._id as string;
       }
+
       const hashedMessage = await bcrypt.hash(content, 10);
       const newMessage = await this.MessageModel.create({
         sender: senderId,
-        reciever: recieverId,
         content: hashedMessage,
         conversation: conversationId,
         messageStatus: 'sent',
