@@ -1,10 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
-export type ConvPartDocument = ConvPart & Document;
+export type ConversationParticipantDocument = ConversationParticipant &
+  Document;
 
 @Schema()
-export class ConvPart {
+export class ConversationParticipant {
   @Prop({ type: [{ type: Types.ObjectId, ref: 'Conversation' }] })
   conversation: Types.ObjectId;
 
@@ -12,4 +13,6 @@ export class ConvPart {
   users: Types.ObjectId;
 }
 
-export const ConvPartSchema = SchemaFactory.createForClass(ConvPart);
+export const ConversationParticipantSchema = SchemaFactory.createForClass(
+  ConversationParticipant,
+);
