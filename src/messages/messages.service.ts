@@ -58,7 +58,6 @@ export class MessageService extends BaseService<MessageDocument> {
       if (!conversationExists || conversationExists === null) {
         const newConv = await this.ConversationModel.create({
           participants: [senderId, recieverId],
-          message: [],
         });
 
         conversationId = newConv._id as string;
@@ -72,10 +71,6 @@ export class MessageService extends BaseService<MessageDocument> {
         content: hashedMessage,
         conversation: conversationId,
         messageStatus: 'sent',
-      });
-
-      await this.ConversationModel.findByIdAndUpdate(conversationId, {
-        $push: { message: hashedMessage },
       });
 
       return {
