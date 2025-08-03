@@ -5,16 +5,17 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConversationParticipantSchema } from './entities/conversation-participant.entity';
 import { UsersModule } from 'src/users/users.module';
 import { ConversationsModule } from 'src/conversations/conversations.module';
-import { MessagesModule } from 'src/messages/messages.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: 'ConvPart', schema: ConversationParticipantSchema },
+      {
+        name: 'ConversationParticipant',
+        schema: ConversationParticipantSchema,
+      },
     ]),
     UsersModule,
     ConversationsModule,
-    MessagesModule,
   ],
   controllers: [ConversationParticipantController],
   providers: [ConversationParticipantService],
