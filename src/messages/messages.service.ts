@@ -61,27 +61,37 @@ export class MessageService extends BaseService<MessageDocument> {
 
       if (!conversationExists || conversationExists === null) {
         const newConv = await this.ConversationModel.create({
-          participants: [senderId, recieverId],
+          participants: [],
         });
 
         conversationId = newConv._id as string;
+
+        await this.ConversationModel.findByIdAndUpdate(
+          newConv._id,
+          { $addToSet: { participants: { $each: [senderId, recieverId] } } }, // avoids duplicates
+        );
       } else {
         conversationId = conversationExists._id as string;
-        const conversationParticipantId = conversationExists.participants;
-        const conversationParticipantExists =
-          await this.ConversationParticipantModel.findById(
-            conversationParticipantId,
-          );
-        if (conversationParticipantExists) {
-          await this.ConversationParticipantModel.updateOne({
-            $push: [senderId, recieverId],
-          });
-        }
+        await this.ConversationModel.findByIdAndUpdate(conversationExists._id, {
+          $set: { participants: [senderId, recieverId] },
+        });
       }
+
+      const conversationParticipant =
+        await this.ConversationParticipantModel.create([
+          {
+            conversation: new Types.ObjectId(conversationId),
+            user: new Types.ObjectId(senderId),
+          },
+          {
+            conversation: new Types.ObjectId(conversationId),
+            user: new Types.ObjectId(recieverId),
+          },
+        ]);
 
       const hashedMessage = await bcrypt.hash(content, 10);
       const newMessage = await this.MessageModel.create({
-        sender: senderId,
+        sender: conversationParticipant[0]._id,
         content: hashedMessage,
         conversation: conversationId,
         messageStatus: 'sent',

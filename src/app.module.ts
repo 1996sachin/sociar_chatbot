@@ -6,7 +6,7 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MessagesModule } from './messages/messages.module';
 import { UsersModule } from './users/users.module';
-import { ConvPartModule } from './conversation-participant/conversation-participant.module';
+import { ConversationParticipantModule } from './conversation-participant/conversation-participant.module';
 
 @Module({
   imports: [
@@ -15,9 +15,9 @@ import { ConvPartModule } from './conversation-participant/conversation-particip
     MongooseModule.forRoot(process.env.DATABASE_URL!),
     MessagesModule,
     UsersModule,
-    ConvPartModule,
+    ConversationParticipantModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

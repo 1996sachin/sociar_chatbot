@@ -10,7 +10,7 @@ export class Conversation {
       { type: Types.ObjectId, ref: 'ConversationParticipant', required: true },
     ],
   })
-  participants: Types.ObjectId;
+  participants: [Types.ObjectId];
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
