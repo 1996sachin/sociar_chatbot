@@ -7,9 +7,6 @@ export type ChatDocument = Conversation & Document;
 export class Conversation {
   @Prop({ type: [{ type: Types.ObjectId, ref: 'User', required: true }] })
   participants: Types.ObjectId[];
-
-  @Prop({ type: Types.ObjectId, ref: 'Message', required: true })
-  message: Types.ObjectId[];
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
