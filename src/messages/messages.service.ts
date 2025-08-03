@@ -15,8 +15,8 @@ import {
 } from 'src/conversations/entities/conversation.entity';
 import bcrypt from 'bcrypt';
 import {
-  ConvPart,
-  ConvPartDocument,
+  ConversationParticipant,
+  ConversationParticipantDocument,
 } from 'src/conversation-participant/entities/conversation-participant.entity';
 
 @Injectable()
@@ -27,8 +27,8 @@ export class MessageService extends BaseService<MessageDocument> {
     @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
     @InjectModel(Conversation.name)
     private readonly ConversationModel: Model<ChatDocument>,
-    @InjectModel(ConvPart.name)
-    private readonly ConvPartModel: Model<ConvPartDocument>,
+    @InjectModel(ConversationParticipant.name)
+    private readonly ConversationParticipantModel: Model<ConversationParticipantDocument>,
   ) {
     super(MessageModel);
   }
@@ -44,8 +44,7 @@ export class MessageService extends BaseService<MessageDocument> {
     },
   ) {
     try {
-      let { senderId, recieverId, content, conversationId, messageStatus } =
-        body;
+      let { senderId, recieverId, content, conversationId } = body;
       const senderExists = await this.UserModel.findById(senderId);
 
       const recieverExists = await this.UserModel.findById(recieverId);
@@ -68,6 +67,16 @@ export class MessageService extends BaseService<MessageDocument> {
         conversationId = newConv._id as string;
       } else {
         conversationId = conversationExists._id as string;
+        const conversationParticipantId = conversationExists.participants;
+        const conversationParticipantExists =
+          await this.ConversationParticipantModel.findById(
+            conversationParticipantId,
+          );
+        if (conversationParticipantExists) {
+          await this.ConversationParticipantModel.updateOne({
+            $push: [senderId, recieverId],
+          });
+        }
       }
 
       const hashedMessage = await bcrypt.hash(content, 10);
