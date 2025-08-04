@@ -47,6 +47,7 @@ export class MessageService extends BaseService<MessageDocument> {
       if (!conversationExists || conversationExists === null) {
         const newConv = await this.ConversationModel.create({
           participants: [],
+          lastMessage: content,
         });
 
         conversationId = newConv._id as string;
@@ -89,6 +90,7 @@ export class MessageService extends BaseService<MessageDocument> {
           $addToSet: {
             participants: { $each: participantsIds },
           },
+          $set: { lastMessage: content },
         },
         { new: true },
       ).exec();
