@@ -1,5 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/base.service';
 import { ChatDocument, Conversation } from './entities/conversation.entity';
 import { InjectModel } from '@nestjs/mongoose';
@@ -13,23 +13,24 @@ export class ConversationsService extends BaseService<ChatDocument> {
     super(ConversationModel);
   }
 
-  async fetchConversations(page: string, limit: string) {
+  async fetchConversations(page: string, limit: string, senderId: string) {
     try {
       const pageNumber = parseInt(page, 10) || 10;
       const limitNum = parseInt(limit, 10) || 10;
       const offset = (pageNumber - 1) * limitNum;
+      const senderIdObj = new Types.ObjectId(senderId);
 
       const data = await this.ConversationModel.find({})
+        .populate({
+          path: 'participants',
+          match: { user: { $ne: senderIdObj } },
+          populate: { path: 'user', select: 'name' },
+        })
         .skip(offset)
         .limit(limitNum)
         .exec();
 
-      if (Object.keys(data).length === 0) {
-        return {
-          message: 'No conversations has been done yet.',
-        };
-      }
-
+      console.log(data, 'nigruuuu');
       return {
         message: 'Conversations fetched successfully',
         data,
