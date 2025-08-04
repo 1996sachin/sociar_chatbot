@@ -1,9 +1,4 @@
-import {
-  Body,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Body, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/base.service';
 import { MessageDocument, Message } from './entities/message.entity';
@@ -45,19 +40,9 @@ export class MessageService extends BaseService<MessageDocument> {
   ) {
     try {
       let { senderId, recieverId, content, conversationId } = body;
-      const senderExists = await this.UserModel.findById(senderId);
 
-      const recieverExists = await this.UserModel.findById(recieverId);
       const conversationExists =
         await this.ConversationModel.findById(conversationId);
-
-      if (!senderExists) {
-        throw new NotFoundException('No such sender found');
-      }
-
-      if (!recieverExists) {
-        throw new NotFoundException('No such reciever found');
-      }
 
       if (!conversationExists || conversationExists === null) {
         const newConv = await this.ConversationModel.create({
@@ -65,29 +50,54 @@ export class MessageService extends BaseService<MessageDocument> {
         });
 
         conversationId = newConv._id as string;
-
-        await this.ConversationModel.findByIdAndUpdate(
-          newConv._id,
-          { $addToSet: { participants: { $each: [senderId, recieverId] } } }, // avoids duplicates
-        );
       } else {
         conversationId = conversationExists._id as string;
-        await this.ConversationModel.findByIdAndUpdate(conversationExists._id, {
-          $set: { participants: [senderId, recieverId] },
-        });
       }
 
-      const conversationParticipant =
-        await this.ConversationParticipantModel.create([
+      const senderParticipant =
+        await this.ConversationParticipantModel.findOneAndUpdate(
           {
             conversation: new Types.ObjectId(conversationId),
             user: new Types.ObjectId(senderId),
           },
           {
             conversation: new Types.ObjectId(conversationId),
+            user: new Types.ObjectId(senderId),
+          },
+          { upsert: true, new: true },
+        );
+
+      const receiverParticipant =
+        await this.ConversationParticipantModel.findOneAndUpdate(
+          {
+            conversation: new Types.ObjectId(conversationId),
             user: new Types.ObjectId(recieverId),
           },
-        ]);
+          {
+            conversation: new Types.ObjectId(conversationId),
+            user: new Types.ObjectId(recieverId),
+          },
+          { upsert: true, new: true },
+        );
+
+      const conversationParticipant = [senderParticipant, receiverParticipant];
+      const participantsIds = conversationParticipant.map((p) => p._id);
+
+      await this.ConversationModel.findByIdAndUpdate(
+        new Types.ObjectId(conversationId),
+        {
+          $addToSet: {
+            participants: { $each: participantsIds },
+          },
+        },
+        { new: true },
+      ).populate({
+        path: 'participants',
+        populate: {
+          path: 'user',
+          select: 'name',
+        },
+      });
 
       const hashedMessage = await bcrypt.hash(content, 10);
       const newMessage = await this.MessageModel.create({
