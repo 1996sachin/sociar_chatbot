@@ -9,7 +9,6 @@ export class DatabaseService implements OnModuleDestroy {
   async getTenentDb(tenentId: string): Promise<mongoose.Connection> {
     if (!this.isConnected) {
       const uri = process.env.DATABASE_URL;
-      console.log(process.env.DATABASE_URL, 'hi there');
 
       if (!uri) throw new NotFoundException('DATABASE_URL not found');
       await mongoose.connect(uri, { maxPoolSize: 10 });
