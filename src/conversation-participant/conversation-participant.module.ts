@@ -19,6 +19,6 @@ import { ConversationsModule } from 'src/conversations/conversations.module';
   ],
   controllers: [ConversationParticipantController],
   providers: [ConversationParticipantService],
-  exports: [MongooseModule],
+  exports: [MongooseModule, ConversationParticipantService],
 })
 export class ConversationParticipantModule {}

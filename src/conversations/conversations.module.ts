@@ -13,6 +13,6 @@ import { DatabaseService } from 'src/database/database.service';
   ],
   controllers: [ConversationsController],
   providers: [DatabaseService, ConversationsService],
-  exports: [MongooseModule],
+  exports: [MongooseModule, ConversationsService],
 })
 export class ConversationsModule {}
