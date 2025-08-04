@@ -78,6 +78,9 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     const { participants } = data;
 
+    //TODO
+    // Check if participants exists
+
     //TODO: Validate If conversation of same participants exists
 
     // const asdf = await this.conversationService.getRepository().aggregate([
@@ -132,6 +135,10 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (data.userId) await this.init({ userId: data.userId }, client);
 
     const { conversationId, message } = data;
+    //TODO
+    // Check conversationId type
+    // Check If conversationId exists
+    // Check If user is part of conversation
 
     // Get participants of conversation
     const participants = await this.conversationPService
@@ -181,12 +188,5 @@ export class ChatGateway implements OnGatewayDisconnect {
       .forEach((socket) => {
         if (socket) socket.emit('message', data.message);
       });
-  }
-
-  // For Testing Purpose
-  @SubscribeMessage('test')
-  test(@MessageBody() data: number): any {
-    const sock = this.socketStore.getAll();
-    console.log('log', sock);
   }
 }
