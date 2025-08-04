@@ -12,17 +12,23 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { SocketStore } from './socket.store';
+import { MessageService } from 'src/messages/messages.service';
+import { ConversationsService } from 'src/conversations/conversations.service';
+import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
+import { UsersService } from 'src/users/users.service';
+import { Types } from 'mongoose';
 
 interface InitializeChat {
   userId: string;
 }
 
 interface CreateConversation {
-  userId: string;
+  userId?: string;
   participants: string[];
 }
 
 interface SendMessage {
+  userId?: string;
   conversationId: string;
   message: string;
 }
@@ -35,8 +41,14 @@ interface SendMessage {
 export class ChatGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
-  temp: { convo1: string[] } = { convo1: [] };
-  constructor(private readonly socketStore: SocketStore) {}
+
+  constructor(
+    private readonly socketStore: SocketStore,
+    private readonly userService: UsersService,
+    private readonly conversationService: ConversationsService,
+    private readonly messageService: MessageService,
+    private readonly conversationPService: ConversationParticipantService,
+  ) {}
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -45,41 +57,114 @@ export class ChatGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('init')
-  init(
+  async init(
     @MessageBody() data: InitializeChat,
     @ConnectedSocket() client: Socket,
-  ): any {
+  ) {
     console.log('connected', client.id, data.userId);
     this.socketStore.add(data.userId, client.id, client);
-    // Add user to db
-    return;
+    await this.userService.saveIfNotExists({ userId: data.userId });
   }
 
   @SubscribeMessage('createConversation')
-  createConversation(@MessageBody() data: CreateConversation): any {
-    // Make conversation in db with participants[]
-    this.temp['convo1'] = [data.userId, ...data.participants];
-    console.log(this.temp);
-    const conversation = 'convo1';
+  async createConversation(
+    @MessageBody() data: CreateConversation,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = this.socketStore.getUserFromSocket(client.id);
+    if (!userId && !data.userId) throw new Error('Initiate socket connection');
+    if (data.userId) await this.init({ userId }, client);
+
+    const { participants } = data;
+
+    //TODO: Validate If conversation of same participants exists
+
+    // const asdf = await this.conversationService.getRepository().aggregate([
+    //   {
+    //     $lookup: {
+    //       from: 'ConversationParticipant', // name of the participants collection
+    //       localField: 'participants', // field in conversations
+    //       foreignField: '_id', // field in participants
+    //       as: 'participantDetails',
+    //     },
+    //   },
+    //   {
+    //     $match: {
+    //       'participantDetails.id': { $in: [...participants, ...userId] },
+    //     },
+    //   },
+    // ]);
+    const conversation = await this.conversationService.save({});
+
+    const allParticipants = [...participants, userId ?? data.userId];
+    const userInfo = await this.userService.findAll({
+      id: { $in: allParticipants },
+    });
+    const conversationParticipant = await this.conversationPService.saveMany(
+      userInfo.map((participant) => ({
+        conversation: conversation.id,
+        user: participant._id,
+      })),
+    );
+
+    // Update in conversation with participants
+    await this.conversationService.update(conversation.id, {
+      participants: conversationParticipant,
+    });
+
     // Send conversationId
     return {
       event: 'conversationInfo',
-      data: { conversationId: conversation },
+      data: { conversationId: conversation.id },
     };
   }
 
   @SubscribeMessage('sendMessage')
-  sendMessage(
+  async sendMessage(
     @MessageBody() data: SendMessage,
     @ConnectedSocket() client: Socket,
   ) {
+    // Get userId from socket
+    const userId = this.socketStore.getUserFromSocket(client.id);
+    if (!userId && !data.userId) throw new Error('Initiate socket connection');
+    if (data.userId) await this.init({ userId }, client);
+
+    const { conversationId, message } = data;
+
+    // Get participants of conversation
+    const participants = await this.conversationPService
+      .getRepository()
+      .aggregate([
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'userDetail',
+          },
+        },
+        {
+          $match: {
+            'userDetail.userId': { $ne: userId },
+          },
+        },
+      ]);
+
+    const user = await this.userService.findWhere({ userId });
+    
     // Add message to db
+    await this.messageService.save({
+      conversation: new Types.ObjectId(conversationId),
+      content: message, // Crypt
+      messageStatus: 'sent',
+      sender: new Types.ObjectId(user[0].id),
+    });
 
     // If the user is in online "notify" that user with message
-    const participants = this.temp[`${data.conversationId}`];
     participants
-      .map((participant: any) => this.socketStore.getFromUser(participant))
-      .filter((socketParticipant) => socketParticipant.id !== client.id)
+      .map((participant: any) =>
+        this.socketStore.getFromUser(participant.userDetail[0].userId),
+      )
       .forEach((socket) => socket.emit('message', data.message));
   }
 
@@ -88,13 +173,5 @@ export class ChatGateway implements OnGatewayDisconnect {
   test(@MessageBody() data: number): any {
     const sock = this.socketStore.getAll();
     console.log('log', sock);
-    return { event: 'notify', data: 'Your id' };
-  }
-
-  @SubscribeMessage('getOne')
-  getOne(@MessageBody() data: number, @ConnectedSocket() client: Socket): any {
-    // const sock = this.socketStore.get();
-    // console.log('log', sock);
-    return { event: 'notify', data: 'Your id' };
   }
 }

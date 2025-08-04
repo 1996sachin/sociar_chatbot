@@ -24,6 +24,10 @@ export class SocketStore {
     return Array.from(this.store.keys());
   }
 
+  getUserFromSocket(socketId: string) {
+    return getByValue(this.userSocketStore, socketId);
+  }
+
   remove(socketId) {
     this.userSocketStore.delete(getByValue(this.userSocketStore, socketId));
     this.store.delete(socketId);
