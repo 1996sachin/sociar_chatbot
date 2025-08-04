@@ -91,13 +91,7 @@ export class MessageService extends BaseService<MessageDocument> {
           },
         },
         { new: true },
-      ).populate({
-        path: 'participants',
-        populate: {
-          path: 'user',
-          select: 'name',
-        },
-      });
+      ).exec();
 
       const hashedMessage = await bcrypt.hash(content, 10);
       const newMessage = await this.MessageModel.create({
@@ -129,6 +123,7 @@ export class MessageService extends BaseService<MessageDocument> {
       })
         .skip(offset)
         .limit(limitNum)
+        .sort({ createdAt: -1 })
         .exec();
 
       return {

@@ -5,6 +5,7 @@ import {
   Body,
   BadRequestException,
   Query,
+  Param,
 } from '@nestjs/common';
 import { ConversationsService } from './conversations.service';
 import { createConversationValidator } from './conversation.validator';
@@ -28,8 +29,12 @@ export class ConversationsController {
     };
   }
 
-  @Get()
-  findAll(@Query('page') page: string, @Query('limit') limit: string) {
-    return this.conversationsService.fetchConversations(page, limit);
+  @Get(':id')
+  findAll(
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+    @Param('id') id: string,
+  ) {
+    return this.conversationsService.fetchConversations(page, limit, id);
   }
 }
