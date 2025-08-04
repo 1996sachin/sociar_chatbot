@@ -20,6 +20,13 @@ export class ConversationsService extends BaseService<ChatDocument> {
       const offset = (pageNumber - 1) * limitNum;
 
       const data = await this.ConversationModel.find({})
+        .populate({
+          path: 'participants',
+          populate: {
+            path: 'user',
+            select: 'name',
+          },
+        })
         .skip(offset)
         .limit(limitNum)
         .exec();

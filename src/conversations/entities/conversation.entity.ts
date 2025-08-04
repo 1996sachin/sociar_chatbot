@@ -11,6 +11,9 @@ export class Conversation {
     ],
   })
   participants: [Types.ObjectId];
+
+  @Prop()
+  lastMessage: string;
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
