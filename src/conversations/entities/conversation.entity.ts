@@ -1,19 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type ChatDocument = Conversation & Document;
 
-@Schema()
+@Schema({ timestamps: true })
 export class Conversation {
-  @Prop({ required: true })
-  participants: any[];
-
-  @Prop({ required: true })
-  message: string;
-
-  @Prop({ required: true })
-  status: string;
+  @Prop({
+    type: [
+      { type: Types.ObjectId, ref: 'ConversationParticipant', required: true },
+    ],
+  })
+  participants: [Types.ObjectId];
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);
-
