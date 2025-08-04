@@ -63,6 +63,7 @@ export class ChatGateway implements OnGatewayDisconnect {
   ) {
     console.log('connected', client.id, data.userId);
     this.socketStore.add(data.userId, client.id, client);
+    console.log(this.socketStore.getAll());
     await this.userService.saveIfNotExists({ userId: data.userId });
   }
 
@@ -98,8 +99,9 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     const allParticipants = [...participants, userId ?? data.userId];
     const userInfo = await this.userService.findAll({
-      id: { $in: allParticipants },
+      userId: { $in: allParticipants },
     });
+
     const conversationParticipant = await this.conversationPService.saveMany(
       userInfo.map((participant) => ({
         conversation: conversation.id,
@@ -127,7 +129,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     // Get userId from socket
     const userId = this.socketStore.getUserFromSocket(client.id);
     if (!userId && !data.userId) throw new Error('Initiate socket connection');
-    if (data.userId) await this.init({ userId }, client);
+    if (data.userId) await this.init({ userId: data.userId }, client);
 
     const { conversationId, message } = data;
 
@@ -135,6 +137,11 @@ export class ChatGateway implements OnGatewayDisconnect {
     const participants = await this.conversationPService
       .getRepository()
       .aggregate([
+        {
+          $match: {
+            conversation: conversationId,
+          },
+        },
         {
           $lookup: {
             from: 'users',
@@ -151,7 +158,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       ]);
 
     const user = await this.userService.findWhere({ userId });
-    
+
     // Add message to db
     await this.messageService.save({
       conversation: new Types.ObjectId(conversationId),
@@ -162,10 +169,18 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     // If the user is in online "notify" that user with message
     participants
+      .filter(
+        (participant) =>
+          ![this.socketStore.getUserFromSocket(client.id), undefined].includes(
+            participant.userDetail[0].userId,
+          ),
+      )
       .map((participant: any) =>
         this.socketStore.getFromUser(participant.userDetail[0].userId),
       )
-      .forEach((socket) => socket.emit('message', data.message));
+      .forEach((socket) => {
+        if (socket) socket.emit('message', data.message);
+      });
   }
 
   // For Testing Purpose
