@@ -44,6 +44,8 @@ export class MessageService extends BaseService<MessageDocument> {
       const conversationExists =
         await this.ConversationModel.findById(conversationId);
 
+      const senderDetails = await this.UserModel.findById(senderId);
+
       if (!conversationExists || conversationExists === null) {
         const newConv = await this.ConversationModel.create({
           participants: [],
@@ -97,7 +99,7 @@ export class MessageService extends BaseService<MessageDocument> {
 
       const hashedMessage = await bcrypt.hash(content, 10);
       const newMessage = await this.MessageModel.create({
-        sender: conversationParticipant[0]._id,
+        userId: senderDetails?.userId,
         content: hashedMessage,
         conversation: conversationId,
         messageStatus: 'sent',

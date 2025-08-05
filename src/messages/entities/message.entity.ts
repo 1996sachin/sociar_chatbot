@@ -14,8 +14,8 @@ export class Message {
   @Prop({ type: Types.ObjectId, ref: 'Conversation', required: true })
   conversation: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  sender: Types.ObjectId;
+  @Prop({ required: true })
+  userId: string;
 
   @Prop({ required: true })
   content: string;

@@ -13,17 +13,17 @@ export class ConversationsService extends BaseService<ChatDocument> {
     super(ConversationModel);
   }
 
-  async fetchConversations(page: string, limit: string, senderId: string) {
+  async fetchConversations(page: string, limit: string, user: string) {
     try {
       const pageNumber = parseInt(page, 10) || 10;
       const limitNum = parseInt(limit, 10) || 10;
       const offset = (pageNumber - 1) * limitNum;
-      const senderIdObj = new Types.ObjectId(senderId);
+      const userIdObj = new Types.ObjectId(user);
 
       const data = await this.ConversationModel.find({})
         .populate({
           path: 'participants',
-          match: { user: { $ne: senderIdObj } },
+          match: { user: { $ne: userIdObj } },
           populate: { path: 'user', select: 'name' },
         })
         .skip(offset)
