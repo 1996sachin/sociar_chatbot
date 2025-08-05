@@ -1,14 +1,22 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Model } from 'mongoose';
 import { BaseService } from 'src/base.service';
 import { ChatDocument, Conversation } from './entities/conversation.entity';
 import { InjectModel } from '@nestjs/mongoose';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class ConversationsService extends BaseService<ChatDocument> {
   constructor(
     @InjectModel(Conversation.name)
     private readonly ConversationModel: Model<ChatDocument>,
+    @Inject()
+    private readonly UserService: UsersService,
   ) {
     super(ConversationModel);
   }
@@ -18,6 +26,13 @@ export class ConversationsService extends BaseService<ChatDocument> {
       const pageNumber = parseInt(page, 10) || 1;
       const limitNum = parseInt(limit, 10) || 10;
       const offset = (pageNumber - 1) * limitNum;
+      const userExists = await this.UserService.getRepository().findOne({
+        userId: user,
+      });
+
+      if (!userExists) {
+        throw new NotFoundException('No user with such userid found');
+      }
 
       const basePipeline = [
         {
@@ -39,7 +54,12 @@ export class ConversationsService extends BaseService<ChatDocument> {
         },
         { $unwind: '$participantDetails.userDetails' },
         {
-          $match: { 'participantDetails.userDetails.userId': { $ne: user } },
+          $match: {
+            'participantDetails.userDetails.userId': {
+              $ne: user,
+              $exists: true,
+            },
+          },
         },
       ];
 

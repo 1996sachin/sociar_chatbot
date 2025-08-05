@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/base.service';
@@ -118,6 +119,15 @@ export class MessageService extends BaseService<MessageDocument> {
       const pageNum = parseInt(page, 10) || 1;
       const limitNum = parseInt(limit, 10) || 10;
       const offset = (pageNum - 1) * limitNum;
+
+      try {
+        const conversation =
+          await this.ConversationService.find(conversationId);
+        console.log('conversation', conversation);
+        if (!conversation) throw new NotFoundException('Invalid Conversation');
+      } catch {
+        throw new NotFoundException('Invalid Conversation');
+      }
 
       await this.getRepository().updateMany(
         {
