@@ -56,7 +56,6 @@ export class ChatGateway implements OnGatewayDisconnect {
   ) {
     console.log('connected', client.id, data.userId);
     this.socketStore.add(data.userId, client.id, client);
-    console.log(this.socketStore.getAll());
     await this.userService.saveIfNotExists({ userId: data.userId });
   }
 

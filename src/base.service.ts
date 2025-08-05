@@ -53,8 +53,6 @@ export class BaseService<T extends Document> {
   }
 
   async update(id: string, data: any) {
-    console.log(data);
-
     // const hashedMsg = await bcrypt.hash(data.content, 10);
     const updated = await this.entity.findByIdAndUpdate(id, {
       $set: data,
