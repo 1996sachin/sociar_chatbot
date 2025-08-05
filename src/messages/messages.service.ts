@@ -11,6 +11,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import bcrypt from 'bcrypt';
 import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
+import { object } from 'zod/v3';
 
 @Injectable()
 export class MessageService extends BaseService<MessageDocument> {
@@ -160,12 +161,16 @@ export class MessageService extends BaseService<MessageDocument> {
           {
             $limit: limitNum,
           },
+          { $project: { conversation: 0 } },
         ])
         .exec();
 
       return {
         message: 'Messages fetched',
-        newData,
+        data: {
+          conversation: conversationId,
+          messages: newData,
+        },
       };
     } catch (error) {
       if (error instanceof Error) {
