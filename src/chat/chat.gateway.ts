@@ -207,6 +207,10 @@ export class ChatGateway implements OnGatewayDisconnect {
       sender: new Types.ObjectId(user[0].id),
     });
 
+    await this.conversationService.update(conversationId, {
+      lastMessage: message,
+    });
+
     // If the user is in online "notify" that user with message
     participants
       .filter(
