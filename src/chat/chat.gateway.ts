@@ -23,12 +23,10 @@ interface InitializeChat {
 }
 
 interface CreateConversation {
-  userId?: string;
   participants: string[];
 }
 
 interface SendMessage {
-  userId?: string;
   conversationId: string;
   message: string;
 }
@@ -52,8 +50,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.socketStore.remove(client.id);
   }
 
-  @SubscribeMessage('init')
-  async init(
+  @SubscribeMessage('init') async init(
     @MessageBody() data: InitializeChat,
     @ConnectedSocket() client: Socket,
   ) {
@@ -69,7 +66,11 @@ export class ChatGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     const userId = this.socketStore.getUserFromSocket(client.id);
-    if (!userId) throw new Error('Initiate socket connection');
+    if (!userId)
+      return {
+        event: 'error',
+        data: { message: 'Initiate socket connection' },
+      };
 
     const { participants } = data;
     const allParticipants = [...participants, userId];
@@ -79,7 +80,10 @@ export class ChatGateway implements OnGatewayDisconnect {
       userId: { $in: allParticipants },
     });
     if (allParticipants.length !== userInfo.length)
-      throw new Error('Invalid participants');
+      return {
+        event: 'error',
+        data: { message: 'Invalid participants' },
+      };
 
     //Validate If conversation of same participants exists
     const conversationParticipants = await this.conversationPService
@@ -147,13 +151,21 @@ export class ChatGateway implements OnGatewayDisconnect {
   ) {
     // Get userId from socket
     const userId = this.socketStore.getUserFromSocket(client.id);
-    if (!userId) throw new Error('Initiate socket connection');
+    if (!userId)
+      return {
+        event: 'error',
+        data: { message: 'Initiate socket connection' },
+      };
 
     const { conversationId, message } = data;
     //TODO Check conversationId type
     // Check If conversationId exists
     const conversation = await this.conversationService.find(conversationId);
-    if (!conversation) throw new Error('Invalid conversation');
+    if (!conversation)
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' },
+      };
 
     // Check If user is part of conversation
     // Get participants of conversation
@@ -179,7 +191,11 @@ export class ChatGateway implements OnGatewayDisconnect {
           },
         },
       ]);
-    if (!participants) throw new Error('Invalid conversation');
+    if (!participants)
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' },
+      };
 
     const user = await this.userService.findWhere({ userId });
 
