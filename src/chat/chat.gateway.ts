@@ -33,11 +33,7 @@ interface SendMessage {
   message: string;
 }
 
-@WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
-})
+@WebSocketGateway()
 export class ChatGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -73,38 +69,58 @@ export class ChatGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     const userId = this.socketStore.getUserFromSocket(client.id);
-    if (!userId && !data.userId) throw new Error('Initiate socket connection');
-    if (data.userId) await this.init({ userId }, client);
+    if (!userId) throw new Error('Initiate socket connection');
 
     const { participants } = data;
+    const allParticipants = [...participants, userId];
 
-    //TODO
-    // Check if participants exists
-
-    //TODO: Validate If conversation of same participants exists
-
-    // const asdf = await this.conversationService.getRepository().aggregate([
-    //   {
-    //     $lookup: {
-    //       from: 'ConversationParticipant', // name of the participants collection
-    //       localField: 'participants', // field in conversations
-    //       foreignField: '_id', // field in participants
-    //       as: 'participantDetails',
-    //     },
-    //   },
-    //   {
-    //     $match: {
-    //       'participantDetails.id': { $in: [...participants, ...userId] },
-    //     },
-    //   },
-    // ]);
-    const conversation = await this.conversationService.save({});
-
-    const allParticipants = [...participants, userId ?? data.userId];
-    const userInfo = await this.userService.findAll({
+    //Check if participants exists
+    const userInfo = await this.userService.findWhere({
       userId: { $in: allParticipants },
     });
+    if (allParticipants.length !== userInfo.length)
+      throw new Error('Invalid participants');
 
+    //Validate If conversation of same participants exists
+    const conversationParticipants = await this.conversationPService
+      .getRepository()
+      .aggregate([
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'userDetails',
+          },
+        },
+        { $unwind: '$userDetails' },
+        {
+          $match: { 'userDetails.userId': { $in: allParticipants } },
+        },
+        {
+          $group: {
+            _id: '$conversation',
+            userDetails: { $push: '$userDetails' },
+            userIds: { $addToSet: '$userDetails.userId' },
+          },
+        },
+        { $match: { $expr: { $setEquals: ['$userIds', allParticipants] } } },
+        {
+          $project: {
+            _id: 0,
+            conversation: '$_id',
+            userDetails: 1,
+            userIds: 1,
+          },
+        },
+      ]);
+    if (conversationParticipants.length > 0)
+      return {
+        event: 'conversationInfo',
+        data: { conversationId: conversationParticipants[0].conversation },
+      };
+
+    const conversation = await this.conversationService.save({});
     const conversationParticipant = await this.conversationPService.saveMany(
       userInfo.map((participant) => ({
         conversation: conversation.id,
@@ -131,15 +147,15 @@ export class ChatGateway implements OnGatewayDisconnect {
   ) {
     // Get userId from socket
     const userId = this.socketStore.getUserFromSocket(client.id);
-    if (!userId && !data.userId) throw new Error('Initiate socket connection');
-    if (data.userId) await this.init({ userId: data.userId }, client);
+    if (!userId) throw new Error('Initiate socket connection');
 
     const { conversationId, message } = data;
-    //TODO
-    // Check conversationId type
+    //TODO Check conversationId type
     // Check If conversationId exists
-    // Check If user is part of conversation
+    const conversation = await this.conversationService.find(conversationId);
+    if (!conversation) throw new Error('Invalid conversation');
 
+    // Check If user is part of conversation
     // Get participants of conversation
     const participants = await this.conversationPService
       .getRepository()
@@ -163,6 +179,7 @@ export class ChatGateway implements OnGatewayDisconnect {
           },
         },
       ]);
+    if (!participants) throw new Error('Invalid conversation');
 
     const user = await this.userService.findWhere({ userId });
 
