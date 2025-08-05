@@ -48,7 +48,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) {}
+  ) { }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -151,7 +151,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       ]);
 
     const user = await this.userService.findWhere({ userId });
-    
+
     // Add message to db
     await this.messageService.save({
       conversation: new Types.ObjectId(conversationId),

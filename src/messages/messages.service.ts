@@ -99,9 +99,9 @@ export class MessageService extends BaseService<MessageDocument> {
 
       const hashedMessage = await bcrypt.hash(content, 10);
       const newMessage = await this.MessageModel.create({
-        userId: senderDetails?.userId,
+        sender: new Types.ObjectId(senderId),
         content: hashedMessage,
-        conversation: conversationId,
+        conversation: new Types.ObjectId(conversationId),
         messageStatus: 'sent',
       });
 
@@ -118,21 +118,58 @@ export class MessageService extends BaseService<MessageDocument> {
 
   async fetchMessages(page: string, limit: string, conversationId: string) {
     try {
-      const pageNum = parseInt(page, 10) || 10;
+      const pageNum = parseInt(page, 10) || 1;
       const limitNum = parseInt(limit, 10) || 10;
       const offset = (pageNum - 1) * limitNum;
 
-      const data = await this.MessageModel.find({
-        conversation: new Types.ObjectId(conversationId),
-      })
-        .skip(offset)
-        .limit(limitNum)
-        .sort({ createdAt: -1 })
+      await this.getRepository().updateMany(
+        {
+          conversation: new Types.ObjectId(conversationId),
+          messageStatus: { $ne: 'delivered' },
+        },
+        {
+          $set: { messageStatus: 'delivered' },
+        },
+      );
+
+      const newData = await this.getRepository()
+        .aggregate([
+          {
+            $match: { conversation: new Types.ObjectId(conversationId) },
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'sender',
+              foreignField: '_id',
+              as: 'userId',
+            },
+          },
+          {
+            $addFields: {
+              sender: {
+                $arrayElemAt: ['$userId.userId', 0],
+              },
+            },
+          },
+          {
+            $unset: 'userId', // Remove the lookup field
+          },
+          {
+            $sort: { createdAt: -1 },
+          },
+          {
+            $skip: offset,
+          },
+          {
+            $limit: limitNum,
+          },
+        ])
         .exec();
 
       return {
         message: 'Messages fetched',
-        data,
+        newData,
       };
     } catch (error) {
       if (error instanceof Error) {
