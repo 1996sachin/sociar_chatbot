@@ -1,6 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
 import { Model, Document } from 'mongoose';
-import bcrypt from 'bcrypt';
 
 export class BaseService<T extends Document> {
   private entity: Model<T>;
@@ -61,6 +60,15 @@ export class BaseService<T extends Document> {
       $set: data,
     });
     if (!updated) {
+      throw new NotFoundException('No such resource found');
+    }
+  }
+
+  async updateMany(id: string, data: []) {
+    const updatedData = await this.entity.findByIdAndUpdate(id, {
+      $set: data,
+    });
+    if (!updatedData) {
       throw new NotFoundException('No such resource found');
     }
   }

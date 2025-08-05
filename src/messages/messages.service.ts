@@ -1,29 +1,26 @@
-import { Body, Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Body,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/base.service';
 import { MessageDocument, Message } from './entities/message.entity';
 import { InjectModel } from '@nestjs/mongoose';
-import { User, UserDocument } from 'src/users/entities/user.entity';
-import {
-  ChatDocument,
-  Conversation,
-} from 'src/conversations/entities/conversation.entity';
 import bcrypt from 'bcrypt';
-import {
-  ConversationParticipant,
-  ConversationParticipantDocument,
-} from 'src/conversation-participant/entities/conversation-participant.entity';
+import { ConversationsService } from 'src/conversations/conversations.service';
+import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 
 @Injectable()
 export class MessageService extends BaseService<MessageDocument> {
   constructor(
     @InjectModel(Message.name)
     private readonly MessageModel: Model<MessageDocument>,
-    @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
-    @InjectModel(Conversation.name)
-    private readonly ConversationModel: Model<ChatDocument>,
-    @InjectModel(ConversationParticipant.name)
-    private readonly ConversationParticipantModel: Model<ConversationParticipantDocument>,
+    @Inject()
+    private readonly ConversationService: ConversationsService,
+    @Inject()
+    private readonly ConversationParticipantService: ConversationParticipantService,
   ) {
     super(MessageModel);
   }
@@ -42,10 +39,10 @@ export class MessageService extends BaseService<MessageDocument> {
       let { senderId, recieverId, content, conversationId } = body;
 
       const conversationExists =
-        await this.ConversationModel.findById(conversationId);
+        await this.ConversationService.getRepository().findById(conversationId);
 
       if (!conversationExists || conversationExists === null) {
-        const newConv = await this.ConversationModel.create({
+        const newConv = await this.ConversationService.getRepository().create({
           participants: [],
           lastMessage: content,
         });
@@ -56,7 +53,7 @@ export class MessageService extends BaseService<MessageDocument> {
       }
 
       const senderParticipant =
-        await this.ConversationParticipantModel.findOneAndUpdate(
+        await this.ConversationParticipantService.getRepository().findOneAndUpdate(
           {
             conversation: new Types.ObjectId(conversationId),
             user: new Types.ObjectId(senderId),
@@ -69,7 +66,7 @@ export class MessageService extends BaseService<MessageDocument> {
         );
 
       const receiverParticipant =
-        await this.ConversationParticipantModel.findOneAndUpdate(
+        await this.ConversationParticipantService.getRepository().findOneAndUpdate(
           {
             conversation: new Types.ObjectId(conversationId),
             user: new Types.ObjectId(recieverId),
@@ -84,22 +81,24 @@ export class MessageService extends BaseService<MessageDocument> {
       const conversationParticipant = [senderParticipant, receiverParticipant];
       const participantsIds = conversationParticipant.map((p) => p._id);
 
-      await this.ConversationModel.findByIdAndUpdate(
-        new Types.ObjectId(conversationId),
-        {
-          $addToSet: {
-            participants: { $each: participantsIds },
+      await this.ConversationService.getRepository()
+        .findByIdAndUpdate(
+          new Types.ObjectId(conversationId),
+          {
+            $addToSet: {
+              participants: { $each: participantsIds },
+            },
+            $set: { lastMessage: content },
           },
-          $set: { lastMessage: content },
-        },
-        { new: true },
-      ).exec();
+          { new: true },
+        )
+        .exec();
 
       const hashedMessage = await bcrypt.hash(content, 10);
-      const newMessage = await this.MessageModel.create({
-        sender: conversationParticipant[0]._id,
+      const newMessage = await this.getRepository().create({
+        sender: new Types.ObjectId(senderId),
         content: hashedMessage,
-        conversation: conversationId,
+        conversation: new Types.ObjectId(conversationId),
         messageStatus: 'sent',
       });
 
@@ -116,21 +115,58 @@ export class MessageService extends BaseService<MessageDocument> {
 
   async fetchMessages(page: string, limit: string, conversationId: string) {
     try {
-      const pageNum = parseInt(page, 10) || 10;
+      const pageNum = parseInt(page, 10) || 1;
       const limitNum = parseInt(limit, 10) || 10;
       const offset = (pageNum - 1) * limitNum;
 
-      const data = await this.MessageModel.find({
-        conversation: new Types.ObjectId(conversationId),
-      })
-        .skip(offset)
-        .limit(limitNum)
-        .sort({ createdAt: -1 })
+      await this.getRepository().updateMany(
+        {
+          conversation: new Types.ObjectId(conversationId),
+          messageStatus: { $ne: 'delivered' },
+        },
+        {
+          $set: { messageStatus: 'delivered' },
+        },
+      );
+
+      const newData = await this.getRepository()
+        .aggregate([
+          {
+            $match: { conversation: new Types.ObjectId(conversationId) },
+          },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'sender',
+              foreignField: '_id',
+              as: 'userId',
+            },
+          },
+          {
+            $addFields: {
+              sender: {
+                $arrayElemAt: ['$userId.userId', 0],
+              },
+            },
+          },
+          {
+            $unset: 'userId', // Remove the lookup field
+          },
+          {
+            $sort: { createdAt: -1 },
+          },
+          {
+            $skip: offset,
+          },
+          {
+            $limit: limitNum,
+          },
+        ])
         .exec();
 
       return {
         message: 'Messages fetched',
-        data,
+        newData,
       };
     } catch (error) {
       if (error instanceof Error) {
