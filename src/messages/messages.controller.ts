@@ -23,7 +23,7 @@ export class MessagesController {
   constructor(
     private readonly messagesService: MessageService,
     @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
-  ) {}
+  ) { }
 
   @Post()
   async create(

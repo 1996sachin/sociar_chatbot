@@ -1,29 +1,26 @@
-import { Body, Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Body,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/base.service';
 import { MessageDocument, Message } from './entities/message.entity';
 import { InjectModel } from '@nestjs/mongoose';
-import { User, UserDocument } from 'src/users/entities/user.entity';
-import {
-  ChatDocument,
-  Conversation,
-} from 'src/conversations/entities/conversation.entity';
 import bcrypt from 'bcrypt';
-import {
-  ConversationParticipant,
-  ConversationParticipantDocument,
-} from 'src/conversation-participant/entities/conversation-participant.entity';
+import { ConversationsService } from 'src/conversations/conversations.service';
+import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 
 @Injectable()
 export class MessageService extends BaseService<MessageDocument> {
   constructor(
     @InjectModel(Message.name)
     private readonly MessageModel: Model<MessageDocument>,
-    @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
-    @InjectModel(Conversation.name)
-    private readonly ConversationModel: Model<ChatDocument>,
-    @InjectModel(ConversationParticipant.name)
-    private readonly ConversationParticipantModel: Model<ConversationParticipantDocument>,
+    @Inject()
+    private readonly ConversationService: ConversationsService,
+    @Inject()
+    private readonly ConversationParticipantService: ConversationParticipantService,
   ) {
     super(MessageModel);
   }
@@ -42,12 +39,10 @@ export class MessageService extends BaseService<MessageDocument> {
       let { senderId, recieverId, content, conversationId } = body;
 
       const conversationExists =
-        await this.ConversationModel.findById(conversationId);
-
-      const senderDetails = await this.UserModel.findById(senderId);
+        await this.ConversationService.getRepository().findById(conversationId);
 
       if (!conversationExists || conversationExists === null) {
-        const newConv = await this.ConversationModel.create({
+        const newConv = await this.ConversationService.getRepository().create({
           participants: [],
           lastMessage: content,
         });
@@ -58,7 +53,7 @@ export class MessageService extends BaseService<MessageDocument> {
       }
 
       const senderParticipant =
-        await this.ConversationParticipantModel.findOneAndUpdate(
+        await this.ConversationParticipantService.getRepository().findOneAndUpdate(
           {
             conversation: new Types.ObjectId(conversationId),
             user: new Types.ObjectId(senderId),
@@ -71,7 +66,7 @@ export class MessageService extends BaseService<MessageDocument> {
         );
 
       const receiverParticipant =
-        await this.ConversationParticipantModel.findOneAndUpdate(
+        await this.ConversationParticipantService.getRepository().findOneAndUpdate(
           {
             conversation: new Types.ObjectId(conversationId),
             user: new Types.ObjectId(recieverId),
@@ -86,19 +81,21 @@ export class MessageService extends BaseService<MessageDocument> {
       const conversationParticipant = [senderParticipant, receiverParticipant];
       const participantsIds = conversationParticipant.map((p) => p._id);
 
-      await this.ConversationModel.findByIdAndUpdate(
-        new Types.ObjectId(conversationId),
-        {
-          $addToSet: {
-            participants: { $each: participantsIds },
+      await this.ConversationService.getRepository()
+        .findByIdAndUpdate(
+          new Types.ObjectId(conversationId),
+          {
+            $addToSet: {
+              participants: { $each: participantsIds },
+            },
+            $set: { lastMessage: content },
           },
-          $set: { lastMessage: content },
-        },
-        { new: true },
-      ).exec();
+          { new: true },
+        )
+        .exec();
 
       const hashedMessage = await bcrypt.hash(content, 10);
-      const newMessage = await this.MessageModel.create({
+      const newMessage = await this.getRepository().create({
         sender: new Types.ObjectId(senderId),
         content: hashedMessage,
         conversation: new Types.ObjectId(conversationId),
