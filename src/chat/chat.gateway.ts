@@ -174,7 +174,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       .aggregate([
         {
           $match: {
-            conversation: conversationId,
+            conversation: new Types.ObjectId(conversationId),
           },
         },
         {
@@ -191,6 +191,7 @@ export class ChatGateway implements OnGatewayDisconnect {
           },
         },
       ]);
+
     if (!participants)
       return {
         event: 'error',
