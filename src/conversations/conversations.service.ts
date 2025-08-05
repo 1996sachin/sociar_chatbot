@@ -30,7 +30,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
         .limit(limitNum)
         .exec();
 
-      console.log(data, 'nigruuuu');
       return {
         message: 'Conversations fetched successfully',
         data,
