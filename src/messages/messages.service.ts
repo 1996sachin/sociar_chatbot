@@ -94,10 +94,9 @@ export class MessageService extends BaseService<MessageDocument> {
         )
         .exec();
 
-      const hashedMessage = await bcrypt.hash(content, 10);
       const newMessage = await this.getRepository().create({
         sender: new Types.ObjectId(senderId),
-        content: hashedMessage,
+        content: content,
         conversation: new Types.ObjectId(conversationId),
         messageStatus: 'sent',
       });
