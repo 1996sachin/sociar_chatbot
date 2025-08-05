@@ -42,7 +42,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) { }
+  ) {}
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -124,9 +124,10 @@ export class ChatGateway implements OnGatewayDisconnect {
       };
 
     const conversation = await this.conversationService.save({});
+
     const conversationParticipant = await this.conversationPService.saveMany(
       userInfo.map((participant) => ({
-        conversation: conversation.id,
+        conversation: new Types.ObjectId(conversation.id),
         user: participant._id,
       })),
     );
