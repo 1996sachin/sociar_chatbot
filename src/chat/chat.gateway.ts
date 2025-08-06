@@ -208,7 +208,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     const user = await this.userService.findWhere({ userId });
 
     // Add message to db
-    await this.messageService.save({
+    const messageInfo = await this.messageService.save({
       conversation: new Types.ObjectId(conversationId),
       content: message, // Crypt
       messageStatus: 'sent',
@@ -231,7 +231,11 @@ export class ChatGateway implements OnGatewayDisconnect {
         this.socketStore.getFromUser(participant.userDetail[0].userId),
       )
       .forEach((socket) => {
-        if (socket) socket.emit('message', data.message);
+        if (socket)
+          socket.emit('message', {
+            message: data.message,
+            createdAt: (messageInfo as any).createdAt,
+          });
       });
   }
 }
