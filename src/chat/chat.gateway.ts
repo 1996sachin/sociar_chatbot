@@ -158,7 +158,14 @@ export class ChatGateway implements OnGatewayDisconnect {
       };
 
     const { conversationId, message } = data;
-    //TODO Check conversationId type
+
+    // Check conversationId type
+    if (!Types.ObjectId.isValid(conversationId))
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' },
+      };
+
     // Check If conversationId exists
     const conversation = await this.conversationService.find(conversationId);
     if (!conversation)
