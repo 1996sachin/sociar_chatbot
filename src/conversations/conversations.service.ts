@@ -35,6 +35,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       }
 
       const basePipeline = [
+        // Lookup all participants with their user info in one go
         {
           $lookup: {
             from: 'conversationparticipants',
@@ -43,60 +44,70 @@ export class ConversationsService extends BaseService<ChatDocument> {
             as: 'participantDetails',
           },
         },
-        { $unwind: '$participantDetails' },
-
-        // Join users
+        {
+          $unwind: '$participantDetails',
+        },
         {
           $lookup: {
             from: 'users',
             localField: 'participantDetails.user',
             foreignField: '_id',
-            as: 'userDetails',
+            as: 'participantDetails.userInfo',
           },
         },
-        { $unwind: '$userDetails' },
+        {
+          $unwind: '$participantDetails.userInfo',
+        },
 
-        // Filter conversations where given user is a participant
+        // Group back by conversation, reconstruct participant list
+        {
+          $group: {
+            _id: '$_id',
+            doc: { $first: '$$ROOT' },
+            participants: {
+              $push: {
+                participantId: '$participantDetails._id',
+                userId: '$participantDetails.userInfo.userId',
+                userInfo: '$participantDetails.userInfo',
+              },
+            },
+          },
+        },
+
+        // Move fields back to top level
+        {
+          $replaceRoot: {
+            newRoot: {
+              $mergeObjects: ['$doc', { participants: '$participants' }],
+            },
+          },
+        },
+
+        // Filter to only conversations where the user is one of the participants
         {
           $match: {
-            'userDetails.userId': user,
+            'participants.userId': user,
           },
         },
 
-        // Lookup all participants again (for excluding self)
+        // Project other participants (excluding self)
         {
-          $lookup: {
-            from: 'conversationparticipants',
-            localField: 'participants',
-            foreignField: '_id',
-            as: 'otherParticipants',
+          $addFields: {
+            otherParticipants: {
+              $filter: {
+                input: '$participants',
+                as: 'p',
+                cond: { $ne: ['$$p.userId', user] },
+              },
+            },
           },
         },
         { $unwind: '$otherParticipants' },
-
-        // Join their user details
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'otherParticipants.user',
-            foreignField: '_id',
-            as: 'otherUser',
-          },
-        },
-        { $unwind: '$otherUser' },
-
-        // Exclude self userId
-        {
-          $match: {
-            'otherUser.userId': { $ne: user },
-          },
-        },
       ];
-
       const totalCountResult = await this.getRepository()
         .aggregate([
           ...basePipeline,
-          { $sort: { updatedAt: -1 } },
+          { $sort: { updatedAt: 1 } },
           { $count: 'total' },
         ])
         .exec();
@@ -109,7 +120,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
           ...basePipeline,
           {
             $project: {
-              userId: '$otherUser.userId',
+              userId: '$otherParticipants.userId',
               lastMessage: 1,
               updatedAt: 1,
             },
