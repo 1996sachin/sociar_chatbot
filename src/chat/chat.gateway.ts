@@ -235,6 +235,7 @@ export class ChatGateway implements OnGatewayDisconnect {
           socket.emit('message', {
             message: data.message,
             createdAt: (messageInfo as any).createdAt,
+            new: conversation.lastMessage ? false : true,
           });
       });
   }
