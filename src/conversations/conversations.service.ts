@@ -44,21 +44,51 @@ export class ConversationsService extends BaseService<ChatDocument> {
           },
         },
         { $unwind: '$participantDetails' },
+
+        // Join users
         {
           $lookup: {
             from: 'users',
             localField: 'participantDetails.user',
             foreignField: '_id',
-            as: 'participantDetails.userDetails',
+            as: 'userDetails',
           },
         },
-        { $unwind: '$participantDetails.userDetails' },
+        { $unwind: '$userDetails' },
+
+        // Filter conversations where given user is a participant
         {
           $match: {
-            'participantDetails.userDetails.userId': {
-              $ne: user,
-              $exists: true,
-            },
+            'userDetails.userId': '15c67e36-f347-41b7-9619-e3756bfab6ee',
+          },
+        },
+
+        // Lookup all participants again (for excluding self)
+        {
+          $lookup: {
+            from: 'conversationparticipants',
+            localField: 'participants',
+            foreignField: '_id',
+            as: 'otherParticipants',
+          },
+        },
+        { $unwind: '$otherParticipants' },
+
+        // Join their user details
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'otherParticipants.user',
+            foreignField: '_id',
+            as: 'otherUser',
+          },
+        },
+        { $unwind: '$otherUser' },
+
+        // Exclude self userId
+        {
+          $match: {
+            'otherUser.userId': { $ne: user },
           },
         },
       ];
@@ -79,7 +109,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
           ...basePipeline,
           {
             $project: {
-              userId: '$participantDetails.userDetails.userId',
+              userId: '$otherUser.userId',
               lastMessage: 1,
               updatedAt: 1,
             },
