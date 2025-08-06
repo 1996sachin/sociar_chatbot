@@ -78,11 +78,21 @@ export class ChatGateway implements OnGatewayDisconnect {
     const userInfo = await this.userService.findWhere({
       userId: { $in: allParticipants },
     });
-    if (allParticipants.length !== userInfo.length)
-      return {
-        event: 'error',
-        data: { message: 'Invalid participants' },
-      };
+    let newUserInfo;
+    if (allParticipants.length !== userInfo.length) {
+      const newUsers = allParticipants.filter((participant) =>
+        userInfo.find((user) => user.userId !== participant),
+      );
+      newUserInfo = await this.userService.saveMany(
+        newUsers.map((newUser) => ({
+          userId: newUser,
+        })),
+      );
+      // return {
+      //   event: 'error',
+      //   data: { message: 'Invalid participants' },
+      // };
+    }
 
     //Validate If conversation of same participants exists
     const conversationParticipants = await this.conversationPService
@@ -126,7 +136,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     const conversation = await this.conversationService.save({});
 
     const conversationParticipant = await this.conversationPService.saveMany(
-      userInfo.map((participant) => ({
+      [...userInfo, ...newUserInfo].map((participant) => ({
         conversation: new Types.ObjectId(conversation.id),
         user: participant._id,
       })),
