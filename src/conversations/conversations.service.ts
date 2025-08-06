@@ -64,7 +64,11 @@ export class ConversationsService extends BaseService<ChatDocument> {
       ];
 
       const totalCountResult = await this.getRepository()
-        .aggregate([...basePipeline, { $count: 'total' }])
+        .aggregate([
+          ...basePipeline,
+          { $sort: { updatedAt: -1 } },
+          { $count: 'total' },
+        ])
         .exec();
 
       const totalCount = totalCountResult[0]?.total || 0;
