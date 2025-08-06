@@ -59,7 +59,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
         // Filter conversations where given user is a participant
         {
           $match: {
-            'userDetails.userId': '15c67e36-f347-41b7-9619-e3756bfab6ee',
+            'userDetails.userId': user,
           },
         },
 
