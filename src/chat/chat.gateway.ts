@@ -231,14 +231,17 @@ export class ChatGateway implements OnGatewayDisconnect {
         this.socketStore.getFromUser(participant.userDetail[0].userId),
       )
       .forEach((socket) => {
-        if (socket)
+        if (socket) {
+          if (!conversation.lastMessage)
+            socket.emit('newConversationInfo', {
+              conversationId: conversationId,
+              userId: userId,
+            });
           socket.emit('message', {
             message: data.message,
             createdAt: (messageInfo as any).createdAt,
-            new: conversation.lastMessage ? false : true,
-            conversationId: conversationId,
-            userId: userId,
           });
+        }
       });
   }
 }
