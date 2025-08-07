@@ -1,29 +1,17 @@
 import { InjectModel } from '@nestjs/mongoose';
-import {
-  createMessageValidator,
-  updateMessageValidator,
-} from './message.validator';
+import { createMessageValidator } from './message.validator';
 import { MessageService } from './messages.service';
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { User, UserDocument } from 'src/users/entities/user.entity';
 import { Model } from 'mongoose';
+import { ApiQuery } from '@nestjs/swagger';
 
 @Controller('messages')
 export class MessagesController {
   constructor(
     private readonly messagesService: MessageService,
     @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
-  ) { }
+  ) {}
 
   @Post()
   async create(
@@ -51,41 +39,23 @@ export class MessagesController {
   }
 
   @Get(':conversationId')
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number',
+    example: '1',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    example: '10',
+    description: 'Number of data to be fetched',
+  })
   findAll(
     @Param('conversationId') conversationId: string,
-    @Query('page') page: string,
-    @Query('limit') limit: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
   ) {
-    return this.messagesService.fetchMessages(page, limit, conversationId);
-  }
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.messagesService.find(id);
-  }
-
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: unknown) {
-    const data = updateMessageValidator.safeParse(body);
-    if (!data.success) {
-      throw new BadRequestException(data.error.format());
-    }
-    const updated = await this.messagesService.update(id, data.data);
-
-    return {
-      message: 'Message updated successfully',
-      data: updated,
-    };
-  }
-
-  @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-  ): Promise<{ message: string; data: any }> {
-    const deletedMessage = await this.messagesService.delete(id);
-
-    return {
-      message: 'Message deleted successfully',
-      data: deletedMessage,
-    };
+    return this.messagesService.fetchMessages(conversationId, page, limit);
   }
 }

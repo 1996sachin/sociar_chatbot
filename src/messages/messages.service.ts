@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Inject,
   Injectable,
@@ -9,10 +10,8 @@ import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/base.service';
 import { MessageDocument, Message } from './entities/message.entity';
 import { InjectModel } from '@nestjs/mongoose';
-import bcrypt from 'bcrypt';
 import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
-import { object } from 'zod/v3';
 
 @Injectable()
 export class MessageService extends BaseService<MessageDocument> {
@@ -41,7 +40,7 @@ export class MessageService extends BaseService<MessageDocument> {
       let { senderId, recieverId, content, conversationId } = body;
 
       const conversationExists =
-        await this.ConversationService.getRepository().findById(conversationId);
+        await this.ConversationService.find(conversationId);
 
       if (!conversationExists || conversationExists === null) {
         const newConv = await this.ConversationService.getRepository().create({
@@ -114,78 +113,75 @@ export class MessageService extends BaseService<MessageDocument> {
     }
   }
 
-  async fetchMessages(page: string, limit: string, conversationId: string) {
-    try {
-      const pageNum = parseInt(page, 10) || 1;
-      const limitNum = parseInt(limit, 10) || 10;
-      const offset = (pageNum - 1) * limitNum;
+  async fetchMessages(conversationId: string, page?: string, limit?: string) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+    const offset = (pageNum - 1) * limitNum;
 
-      try {
-        const conversation =
-          await this.ConversationService.find(conversationId);
-        console.log('conversation', conversation);
-        if (!conversation) throw new NotFoundException('Invalid Conversation');
-      } catch {
-        throw new NotFoundException('Invalid Conversation');
-      }
-
-      await this.getRepository().updateMany(
-        {
-          conversation: new Types.ObjectId(conversationId),
-          messageStatus: { $ne: 'delivered' },
-        },
-        {
-          $set: { messageStatus: 'delivered' },
-        },
+    if (!Types.ObjectId.isValid(conversationId)) {
+      throw new BadRequestException(
+        'Your provided conversation id is not a valid object id',
       );
-
-      const newData = await this.getRepository()
-        .aggregate([
-          {
-            $match: { conversation: new Types.ObjectId(conversationId) },
-          },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'sender',
-              foreignField: '_id',
-              as: 'userId',
-            },
-          },
-          {
-            $addFields: {
-              sender: {
-                $arrayElemAt: ['$userId.userId', 0],
-              },
-            },
-          },
-          {
-            $unset: 'userId', // Remove the lookup field
-          },
-          {
-            $sort: { createdAt: -1 },
-          },
-          {
-            $skip: offset,
-          },
-          {
-            $limit: limitNum,
-          },
-          { $project: { conversation: 0 } },
-        ])
-        .exec();
-
-      return {
-        message: 'Messages fetched',
-        data: {
-          conversation: conversationId,
-          messages: newData,
-        },
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
-      }
     }
+
+    try {
+      await this.ConversationService.find(conversationId);
+    } catch {
+      throw new NotFoundException('No conversation with such id found');
+    }
+
+    await this.getRepository().updateMany(
+      {
+        conversation: new Types.ObjectId(conversationId),
+        messageStatus: { $ne: 'delivered' },
+      },
+      {
+        $set: { messageStatus: 'delivered' },
+      },
+    );
+
+    const newData = await this.getRepository()
+      .aggregate([
+        {
+          $match: { conversation: new Types.ObjectId(conversationId) },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'sender',
+            foreignField: '_id',
+            as: 'userId',
+          },
+        },
+        {
+          $addFields: {
+            sender: {
+              $arrayElemAt: ['$userId.userId', 0],
+            },
+          },
+        },
+        {
+          $unset: 'userId', // Remove the lookup field
+        },
+        {
+          $sort: { updatedAt: -1 },
+        },
+        {
+          $skip: offset,
+        },
+        {
+          $limit: limitNum,
+        },
+        { $project: { conversation: 0 } },
+      ])
+      .exec();
+
+    return {
+      message: 'Messages fetched',
+      data: {
+        conversation: conversationId,
+        messages: newData,
+      },
+    };
   }
 }
