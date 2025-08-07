@@ -72,6 +72,9 @@ export class ChatGateway implements OnGatewayDisconnect {
       };
 
     const { participants } = data;
+    if (participants.length > 1)
+      return { event: 'error', data: { message: 'Too many participants' } };
+
     const allParticipants = [
       ...participants.map((parti) => parti.toString()),
       userId,
