@@ -72,7 +72,10 @@ export class ChatGateway implements OnGatewayDisconnect {
       };
 
     const { participants } = data;
-    const allParticipants = [...participants, userId];
+    const allParticipants = [
+      ...participants.map((parti) => parti.toString()),
+      userId,
+    ];
     if (participants.length <= 0)
       return {
         event: 'error',
