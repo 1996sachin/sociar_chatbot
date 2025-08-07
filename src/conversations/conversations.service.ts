@@ -37,6 +37,11 @@ export class ConversationsService extends BaseService<ChatDocument> {
       const basePipeline = [
         // Lookup all participants with their user info in one go
         {
+          $match: {
+            lastMessage: { $ne: undefined },
+          },
+        },
+        {
           $lookup: {
             from: 'conversationparticipants',
             localField: 'participants',
