@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import { Model, Document } from 'mongoose';
 
 export class BaseService<T extends Document> {
@@ -30,25 +29,16 @@ export class BaseService<T extends Document> {
 
   async find(id: any) {
     const result = await this.entity.findById(id);
-    if (!result) {
-      throw new NotFoundException('No such resource found');
-    }
     return result;
   }
 
   async findWhere(where: any) {
     const result = await this.entity.find(where);
-    if (!result || result.length === 0) {
-      throw new NotFoundException('No such resource found');
-    }
     return result;
   }
 
   async findAll(where: any) {
     const result = await this.entity.find(where);
-    if (!result) {
-      throw new NotFoundException('No such resource found');
-    }
     return result;
   }
 
@@ -57,25 +47,19 @@ export class BaseService<T extends Document> {
     const updated = await this.entity.findByIdAndUpdate(id, {
       $set: data,
     });
-    if (!updated) {
-      throw new NotFoundException('No such resource found');
-    }
+    return updated;
   }
 
   async updateMany(id: string, data: []) {
     const updatedData = await this.entity.findByIdAndUpdate(id, {
       $set: data,
     });
-    if (!updatedData) {
-      throw new NotFoundException('No such resource found');
-    }
+    return updatedData;
   }
 
   async delete(id: string) {
     const deleted = await this.entity.findByIdAndDelete(id);
-    if (!deleted) {
-      throw new NotFoundException('No sych resource found');
-    }
+    return deleted;
   }
 
   getRepository() {
