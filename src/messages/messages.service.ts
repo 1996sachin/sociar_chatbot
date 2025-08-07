@@ -3,7 +3,6 @@ import {
   Body,
   Inject,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
@@ -36,81 +35,74 @@ export class MessageService extends BaseService<MessageDocument> {
       messageStatus?: string;
     },
   ) {
-    try {
-      let { senderId, recieverId, content, conversationId } = body;
+    let { senderId, recieverId, content, conversationId } = body;
 
-      const conversationExists =
-        await this.ConversationService.find(conversationId);
+    const conversationExists =
+      await this.ConversationService.find(conversationId);
 
-      if (!conversationExists || conversationExists === null) {
-        const newConv = await this.ConversationService.getRepository().create({
-          participants: [],
-          lastMessage: content,
-        });
-
-        conversationId = newConv._id as string;
-      } else {
-        conversationId = conversationExists._id as string;
-      }
-
-      const senderParticipant =
-        await this.ConversationParticipantService.getRepository().findOneAndUpdate(
-          {
-            conversation: new Types.ObjectId(conversationId),
-            user: new Types.ObjectId(senderId),
-          },
-          {
-            conversation: new Types.ObjectId(conversationId),
-            user: new Types.ObjectId(senderId),
-          },
-          { upsert: true, new: true },
-        );
-
-      const receiverParticipant =
-        await this.ConversationParticipantService.getRepository().findOneAndUpdate(
-          {
-            conversation: new Types.ObjectId(conversationId),
-            user: new Types.ObjectId(recieverId),
-          },
-          {
-            conversation: new Types.ObjectId(conversationId),
-            user: new Types.ObjectId(recieverId),
-          },
-          { upsert: true, new: true },
-        );
-
-      const conversationParticipant = [senderParticipant, receiverParticipant];
-      const participantsIds = conversationParticipant.map((p) => p._id);
-
-      await this.ConversationService.getRepository()
-        .findByIdAndUpdate(
-          new Types.ObjectId(conversationId),
-          {
-            $addToSet: {
-              participants: { $each: participantsIds },
-            },
-            $set: { lastMessage: content },
-          },
-          { new: true },
-        )
-        .exec();
-
-      const newMessage = await this.getRepository().create({
-        sender: new Types.ObjectId(senderId),
-        content: content,
-        conversation: new Types.ObjectId(conversationId),
-        messageStatus: 'sent',
+    if (!conversationExists || conversationExists === null) {
+      const newConv = await this.ConversationService.save({
+        participants: [],
+        lastMessage: content,
       });
-
-      return {
-        message: 'Message created successfully',
-        data: newMessage,
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
-      }
+      conversationId = newConv._id as string;
+    } else {
+      conversationId = conversationExists._id as string;
     }
+
+    const senderParticipant =
+      await this.ConversationParticipantService.getRepository().findOneAndUpdate(
+        {
+          conversation: new Types.ObjectId(conversationId),
+          user: new Types.ObjectId(senderId),
+        },
+        {
+          conversation: new Types.ObjectId(conversationId),
+          user: new Types.ObjectId(senderId),
+        },
+        { upsert: true, new: true },
+      );
+
+    const receiverParticipant =
+      await this.ConversationParticipantService.getRepository().findOneAndUpdate(
+        {
+          conversation: new Types.ObjectId(conversationId),
+          user: new Types.ObjectId(recieverId),
+        },
+        {
+          conversation: new Types.ObjectId(conversationId),
+          user: new Types.ObjectId(recieverId),
+        },
+        { upsert: true, new: true },
+      );
+
+    const conversationParticipant = [senderParticipant, receiverParticipant];
+    const participantsIds = conversationParticipant.map((p) => p._id);
+
+    await this.ConversationService.getRepository()
+      .findByIdAndUpdate(
+        new Types.ObjectId(conversationId),
+        {
+          $addToSet: {
+            participants: { $each: participantsIds },
+          },
+          $set: { lastMessage: content },
+        },
+        { new: true },
+      )
+      .exec();
+
+    const newMessage = await this.getRepository().create({
+      sender: new Types.ObjectId(senderId),
+      content: content,
+      conversation: new Types.ObjectId(conversationId),
+      messageStatus: 'sent',
+    });
+
+    return {
+      message: 'Message created successfully',
+      data: newMessage,
+    };
   }
 
   async fetchMessages(conversationId: string, page?: string, limit?: string) {
@@ -124,11 +116,9 @@ export class MessageService extends BaseService<MessageDocument> {
       );
     }
 
-    try {
-      await this.ConversationService.find(conversationId);
-    } catch {
+    const searchConvo = await this.ConversationService.find(conversationId);
+    if (!searchConvo)
       throw new NotFoundException('No conversation with such id found');
-    }
 
     await this.getRepository().updateMany(
       {
