@@ -28,7 +28,7 @@ export class BaseService<T extends Document> {
     return await this.entity.find();
   }
 
-  async find(id: string) {
+  async find(id: any) {
     const result = await this.entity.findById(id);
     if (!result) {
       throw new NotFoundException('No such resource found');
@@ -38,7 +38,7 @@ export class BaseService<T extends Document> {
 
   async findWhere(where: any) {
     const result = await this.entity.find(where);
-    if (!result) {
+    if (!result || result.length === 0) {
       throw new NotFoundException('No such resource found');
     }
     return result;
