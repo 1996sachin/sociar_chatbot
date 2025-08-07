@@ -107,7 +107,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       const totalCountResult = await this.getRepository()
         .aggregate([
           ...basePipeline,
-          { $sort: { updatedAt: 1 } },
+          // { $sort: { updatedAt: 1 } },
           { $count: 'total' },
         ])
         .exec();
@@ -125,6 +125,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
               updatedAt: 1,
             },
           },
+          { $sort: { updatedAt: -1 } },
         ])
         .skip(offset)
         .limit(limitNum)
