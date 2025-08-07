@@ -31,7 +31,13 @@ interface SendMessage {
   message: string;
 }
 
-@WebSocketGateway()
+@WebSocketGateway({
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+})
 export class ChatGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -42,7 +48,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) {}
+  ) { }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
