@@ -73,6 +73,11 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     const { participants } = data;
     const allParticipants = [...participants, userId];
+    if (participants.length <= 0)
+      return {
+        event: 'error',
+        data: { message: 'Empty participants' },
+      };
 
     //Check if participants exists
     const userInfo = await this.userService.findWhere({
@@ -136,10 +141,12 @@ export class ChatGateway implements OnGatewayDisconnect {
     const conversation = await this.conversationService.save({});
 
     const conversationParticipant = await this.conversationPService.saveMany(
-      [...userInfo, ...newUserInfo].map((participant) => ({
-        conversation: new Types.ObjectId(conversation.id),
-        user: participant._id,
-      })),
+      [...userInfo, ...(newUserInfo?.length ? newUserInfo : [])].map(
+        (participant) => ({
+          conversation: new Types.ObjectId(conversation.id),
+          user: participant._id,
+        }),
+      ),
     );
 
     // Update in conversation with participants
