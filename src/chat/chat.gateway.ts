@@ -187,7 +187,9 @@ export class ChatGateway implements OnGatewayDisconnect {
       };
 
     // Check If conversationId exists
-    const conversation = await this.conversationService.find(conversationId);
+    const conversation = await this.conversationService
+      .getRepository()
+      .findById(conversationId);
     if (!conversation)
       return {
         event: 'error',
