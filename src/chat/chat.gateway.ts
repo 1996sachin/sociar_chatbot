@@ -60,6 +60,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody() data: InitializeChat,
     @ConnectedSocket() client: Socket,
   ) {
+    this.socketStore.remove(client.id);
     console.log('connected', client.id, data.userId);
     this.socketStore.add(data.userId, client.id, client);
     await this.userService.saveIfNotExists({ userId: data.userId });
@@ -78,6 +79,9 @@ export class ChatGateway implements OnGatewayDisconnect {
       };
 
     const { participants } = data;
+    if (participants.length > 1)
+      return { event: 'error', data: { message: 'Too many participants' } };
+
     const allParticipants = [
       ...participants.map((parti) => parti.toString()),
       userId,
@@ -193,7 +197,9 @@ export class ChatGateway implements OnGatewayDisconnect {
       };
 
     // Check If conversationId exists
-    const conversation = await this.conversationService.find(conversationId);
+    const conversation = await this.conversationService
+      .getRepository()
+      .findById(conversationId);
     if (!conversation)
       return {
         event: 'error',

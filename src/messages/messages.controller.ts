@@ -1,9 +1,17 @@
 import { InjectModel } from '@nestjs/mongoose';
 import { createMessageValidator } from './message.validator';
 import { MessageService } from './messages.service';
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { User, UserDocument } from 'src/users/entities/user.entity';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { ApiQuery } from '@nestjs/swagger';
 
 @Controller('messages')
@@ -57,5 +65,20 @@ export class MessagesController {
     @Query('limit') limit: string = '10',
   ) {
     return this.messagesService.fetchMessages(conversationId, page, limit);
+  }
+
+  @Delete()
+  async dropDb() {
+    await mongoose.connect(process.env.DATABASE_URL!);
+
+    const db = mongoose.connection.db;
+
+    await db?.dropCollection('conversations');
+    await db?.dropCollection('messages');
+    await db?.dropCollection('conversationparticipants');
+    await db?.dropCollection('users');
+    return {
+      message: 'All four collection dropped successfully',
+    };
   }
 }

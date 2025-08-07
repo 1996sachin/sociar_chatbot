@@ -44,10 +44,10 @@ export class ConversationsController {
     description: 'Number of data to be fetched',
   })
   findAll(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
     @Param('id') id: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
   ) {
-    return this.conversationsService.fetchConversations(page, limit, id);
+    return this.conversationsService.fetchConversations(id, page, limit);
   }
 }

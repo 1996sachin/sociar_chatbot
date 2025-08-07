@@ -16,9 +16,9 @@ export class ConversationsService extends BaseService<ChatDocument> {
     super(ConversationModel);
   }
 
-  async fetchConversations(page: string, limit: string, user: string) {
-    const pageNumber = parseInt(page, 10) || 1;
-    const limitNum = parseInt(limit, 10) || 10;
+  async fetchConversations(user: string, page?: string, limit?: string) {
+    const pageNumber = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 10;
     const offset = (pageNumber - 1) * limitNum;
     const userExists = await this.UserService.findWhere({
       userId: user,
