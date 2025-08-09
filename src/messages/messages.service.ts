@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Body, Inject, Injectable } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/base.service';
 import { MessageDocument, Message } from './entities/message.entity';
@@ -109,16 +103,6 @@ export class MessageService extends BaseService<MessageDocument> {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
     const offset = (pageNum - 1) * limitNum;
-
-    if (!Types.ObjectId.isValid(conversationId)) {
-      throw new BadRequestException(
-        'Your provided conversation id is not a valid object id',
-      );
-    }
-
-    const searchConvo = await this.ConversationService.find(conversationId);
-    if (!searchConvo)
-      throw new NotFoundException('No conversation with such id found');
 
     await this.getRepository().updateMany(
       {

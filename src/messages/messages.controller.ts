@@ -1,7 +1,11 @@
 import { InjectModel } from '@nestjs/mongoose';
-import { createMessageValidator } from './message.validator';
+import {
+  createMessageValidator,
+  fetchMessageValidator,
+} from './message.validator';
 import { MessageService } from './messages.service';
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -13,13 +17,19 @@ import {
 import { User, UserDocument } from 'src/users/entities/user.entity';
 import mongoose, { Model } from 'mongoose';
 import { ApiQuery } from '@nestjs/swagger';
+import {
+  ChatDocument,
+  Conversation,
+} from 'src/conversations/entities/conversation.entity';
 
 @Controller('messages')
 export class MessagesController {
   constructor(
     private readonly messagesService: MessageService,
     @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
-  ) {}
+    @InjectModel(Conversation.name)
+    private readonly ConversationModel: Model<ChatDocument>,
+  ) { }
 
   @Post()
   async create(
@@ -59,12 +69,23 @@ export class MessagesController {
     example: '10',
     description: 'Number of data to be fetched',
   })
-  findAll(
+  async findAll(
     @Param('conversationId') conversationId: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '10',
   ) {
-    return this.messagesService.fetchMessages(conversationId, page, limit);
+    const data = { conversationId, page, limit };
+    const parsedData = await fetchMessageValidator(
+      this.ConversationModel,
+    ).safeParseAsync(data);
+    if (!parsedData.success) {
+      throw new BadRequestException(parsedData.error.format());
+    }
+    return this.messagesService.fetchMessages(
+      parsedData.data.conversationId,
+      parsedData.data.page,
+      parsedData.data.limit,
+    );
   }
 
   @Delete()
