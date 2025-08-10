@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConversationsService } from './conversations.service';
 import { createConversationValidator } from './conversation.validator';
+import { ApiQuery } from '@nestjs/swagger';
 
 @Controller('conversations')
 export class ConversationsController {
@@ -30,11 +31,23 @@ export class ConversationsController {
   }
 
   @Get(':id')
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number',
+    example: '1',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    example: '10',
+    description: 'Number of data to be fetched',
+  })
   findAll(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
     @Param('id') id: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
   ) {
-    return this.conversationsService.fetchConversations(page, limit, id);
+    return this.conversationsService.fetchConversations(id, page, limit);
   }
 }
