@@ -8,16 +8,19 @@ import { MessagesModule } from './messages/messages.module';
 import { UsersModule } from './users/users.module';
 import { ConversationParticipantModule } from './conversation-participant/conversation-participant.module';
 import { ChatModule } from './chat/chat.module';
+import { TenantDatabaseModule } from './tenant-database/tenant-database.module';
 
 @Module({
   imports: [
     ConversationsModule,
     ConfigModule.forRoot({ isGlobal: true }),
     MongooseModule.forRoot(process.env.DATABASE_URL!),
+    TenantDatabaseModule,
     MessagesModule,
     UsersModule,
     ConversationParticipantModule,
     ChatModule,
+    TenantDatabaseModule,
   ],
   controllers: [AppController],
   providers: [AppService],

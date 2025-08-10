@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Scope } from '@nestjs/common';
 import { getByValue } from '../utils/map.utils';
 
-@Injectable()
+@Injectable({ scope: Scope.DEFAULT })
 export class SocketStore {
   private store: Map<string, any> = new Map();
   private userSocketStore: Map<string, string> = new Map();
@@ -17,6 +17,10 @@ export class SocketStore {
 
   get(socketId) {
     return this.store.get(socketId);
+  }
+
+  has(socketId) {
+    return this.store.has(socketId);
   }
 
   // For Test

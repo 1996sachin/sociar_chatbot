@@ -22,8 +22,8 @@ import { Model } from 'mongoose';
 export class MessagesController {
   constructor(
     private readonly messagesService: MessageService,
-    @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
-  ) { }
+    // @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
+  ) {}
 
   @Post()
   async create(
@@ -36,17 +36,18 @@ export class MessagesController {
       messageStatus?: string;
     },
   ): Promise<{ message: string; data: any }> {
-    const data = await createMessageValidator(this.UserModel).parseAsync(body);
+    // const data = await createMessageValidator(this.UserModel).parseAsync(body);
 
-    const createdMessage = await this.messagesService.createMessage({
-      senderId: data.senderId,
-      content: data.content,
-      recieverId: data.recieverId,
-      conversationId: data.conversation,
-    });
+    // const createdMessage = await this.messagesService.createMessage({
+    //   senderId: data.senderId,
+    //   content: data.content,
+    //   recieverId: data.recieverId,
+    //   conversationId: data.conversation,
+    // });
     return {
       message: 'Message created successfully',
-      data: createdMessage,
+      // data: createdMessage,
+      data: '',
     };
   }
 

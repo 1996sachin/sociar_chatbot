@@ -17,6 +17,8 @@ import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
 import { Types } from 'mongoose';
+import { ModuleRef, ContextIdFactory } from '@nestjs/core';
+import { Scope } from '@nestjs/common';
 
 interface InitializeChat {
   userId: string;
@@ -38,10 +40,11 @@ export class ChatGateway implements OnGatewayDisconnect {
 
   constructor(
     private readonly socketStore: SocketStore,
-    private readonly userService: UsersService,
-    private readonly conversationService: ConversationsService,
-    private readonly messageService: MessageService,
-    private readonly conversationPService: ConversationParticipantService,
+    // private readonly userService: UsersService,
+    // private readonly conversationService: ConversationsService,
+    // private readonly messageService: MessageService,
+    // private readonly conversationPService: ConversationParticipantService,
+    private readonly moduleRef: ModuleRef, // to resolve request-scoped deps
   ) {}
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
@@ -54,13 +57,44 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody() data: InitializeChat,
     @ConnectedSocket() client: Socket,
   ) {
-    this.socketStore.remove(client.id);
+    const tenant = client.handshake.headers['x-tenant-id'];
+
+    // Create a fake request context for this socket
+    const contextId = ContextIdFactory.create();
+    (this.moduleRef as any).registerRequestByContextId(
+      { headers: { 'x-tenant-id': tenant } },
+      contextId,
+    );
+
+    // Resolve your request-scoped services
+    const userService = await this.moduleRef.resolve(UsersService, contextId, {
+      strict: false,
+    });
+    const conversationService = await this.moduleRef.resolve(
+      ConversationsService,
+      contextId,
+      { strict: false },
+    );
+    const messageService = await this.moduleRef.resolve(
+      MessageService,
+      contextId,
+      { strict: false },
+    );
+
+    console.log('this.socketStore', this.socketStore); // will work
+    console.log('userService', userService); // will work
+    console.log('conversationService', conversationService); // will work
+
+    // console.log('this.socket', this.socketStore);
+    // console.log('userService', this.userService);
+    // console.log('this.conversationService', this.conversationService);
+    if (this.socketStore.has(client.id)) this.socketStore.remove(client.id);
     console.log('connected', client.id, data.userId);
     this.socketStore.add(data.userId, client.id, client);
-    await this.userService.saveIfNotExists({ userId: data.userId });
+    // await this.userService.saveIfNotExists({ userId: data.userId });
   }
 
-  @SubscribeMessage('createConversation')
+  /* @SubscribeMessage('createConversation')
   async createConversation(
     @MessageBody() data: CreateConversation,
     @ConnectedSocket() client: Socket,
@@ -266,5 +300,5 @@ export class ChatGateway implements OnGatewayDisconnect {
             userId: userId,
           });
       });
-  }
+  } */
 }
