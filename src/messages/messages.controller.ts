@@ -1,4 +1,3 @@
-import { InjectModel } from '@nestjs/mongoose';
 import {
   createMessageValidator,
   fetchMessageValidator,
@@ -10,25 +9,25 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Post,
   Query,
 } from '@nestjs/common';
-import { User, UserDocument } from 'src/users/entities/user.entity';
-import mongoose, { Model } from 'mongoose';
+import mongoose from 'mongoose';
 import { ApiQuery } from '@nestjs/swagger';
-import {
-  ChatDocument,
-  Conversation,
-} from 'src/conversations/entities/conversation.entity';
+import { UsersService } from 'src/users/users.service';
+import { ConversationsService } from 'src/conversations/conversations.service';
 
 @Controller('messages')
 export class MessagesController {
   constructor(
+    @Inject()
     private readonly messagesService: MessageService,
-    @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
-    @InjectModel(Conversation.name)
-    private readonly ConversationModel: Model<ChatDocument>,
+    @Inject()
+    private readonly userService: UsersService,
+    @Inject()
+    private readonly conversationService: ConversationsService,
   ) { }
 
   @Post()
@@ -42,7 +41,9 @@ export class MessagesController {
       messageStatus?: string;
     },
   ): Promise<{ message: string; data: any }> {
-    const data = await createMessageValidator(this.UserModel).parseAsync(body);
+    const data = await createMessageValidator(
+      this.userService.getRepository(),
+    ).parseAsync(body);
 
     const createdMessage = await this.messagesService.createMessage({
       senderId: data.senderId,
@@ -76,7 +77,7 @@ export class MessagesController {
   ) {
     const data = { conversationId, page, limit };
     const parsedData = await fetchMessageValidator(
-      this.ConversationModel,
+      this.conversationService.getRepository(),
     ).safeParseAsync(data);
     if (!parsedData.success) {
       throw new BadRequestException(parsedData.error.format());
