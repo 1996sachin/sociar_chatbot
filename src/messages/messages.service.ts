@@ -1,6 +1,6 @@
 import { Body, Inject, Injectable } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
-import { BaseService } from 'src/base.service';
+import { BaseService } from 'src/common/service/base.service';
 import { MessageDocument, Message } from './entities/message.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConversationsService } from 'src/conversations/conversations.service';
@@ -86,7 +86,7 @@ export class MessageService extends BaseService<MessageDocument> {
       )
       .exec();
 
-    const newMessage = await this.getRepository().create({
+    const newMessage = await this.save({
       sender: new Types.ObjectId(senderId),
       content: content,
       conversation: new Types.ObjectId(conversationId),
