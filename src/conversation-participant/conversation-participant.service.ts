@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { BaseService } from 'src/base.service';
+import { BaseService } from 'src/common/service/base.service';
 import {
   ConversationParticipant,
   ConversationParticipantDocument,

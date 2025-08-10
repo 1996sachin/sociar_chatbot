@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { getByValue } from '../utils/map.utils';
-
+import { getByValue } from 'src/common/utils/map.utils';
 @Injectable()
 export class SocketStore {
   private store: Map<string, any> = new Map();

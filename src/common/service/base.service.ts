@@ -42,16 +42,30 @@ export class BaseService<T extends Document> {
     return result;
   }
 
-  async update(id: string, data: any) {
-    // const hashedMsg = await bcrypt.hash(data.content, 10);
-    const updated = await this.entity.findByIdAndUpdate(id, {
-      $set: data,
-    });
+  async update(id: any, data: any) {
+    const updated = await this.entity.findByIdAndUpdate(
+      id,
+      {
+        $set: data,
+      },
+      { new: true },
+    );
     return updated;
   }
 
-  async updateMany(id: string, data: []) {
-    const updatedData = await this.entity.findByIdAndUpdate(id, {
+  async updateMany(id: any, data: []) {
+    const updated = await this.entity.findByIdAndUpdate(
+      id,
+      {
+        $set: data,
+      },
+      { new: true },
+    );
+    return updated;
+  }
+
+  async updateWhere(filter: any, data: any) {
+    const updatedData = await this.entity.updateMany(filter, {
       $set: data,
     });
     return updatedData;
