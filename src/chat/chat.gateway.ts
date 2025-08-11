@@ -33,6 +33,8 @@ import type {
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
+import { ChatService } from './chat.service';
+import { MessageStatus } from 'src/messages/entities/message.entity';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -51,15 +53,15 @@ export class ChatGateway implements OnGatewayDisconnect {
   constructor(
     private readonly socketStore: SocketStore,
     private readonly userService: UsersService,
+    private readonly chatService: ChatService,
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) { }
+  ) {}
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
-    console.log('disconnected', client.id);
-    logger.debug(`${client.id} has disconnected from the socket server`);
+    logger.debug(`[disconnected] ${client.id}`);
     this.socketStore.remove(client.id);
   }
 
@@ -74,11 +76,8 @@ export class ChatGateway implements OnGatewayDisconnect {
     data: InitializeChatDto,
     @ConnectedSocket() client: Socket,
   ) {
+    logger.debug(`[connected] socket: ${client.id}, userId: ${data.userId}`);
     this.socketStore.remove(client.id);
-    console.log('connected', client.id, data.userId);
-    logger.debug(
-      `${client.id} has connected to the socket server and their userId is ${data.userId}`,
-    );
     this.socketStore.add(data.userId, client.id, client);
     await this.userService.saveIfNotExists({ userId: data.userId });
   }
@@ -199,7 +198,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     const messageInfo = await this.messageService.save({
       conversation: new Types.ObjectId(conversationId),
       content: message, // Crypt
-      messageStatus: 'sent',
+      messageStatus: MessageStatus.SENT,
       sender: new Types.ObjectId(user[0].id),
     });
 
@@ -207,27 +206,29 @@ export class ChatGateway implements OnGatewayDisconnect {
       lastMessage: message,
     });
 
-    const sendMessage = {
-      message: data.message,
-      createdAt: (messageInfo as any).createdAt,
-      new: conversation.lastMessage ? false : true,
-      group: participants.length > 1 ? true : false,
-      conversationId: conversationId,
-      userId: userId,
-    };
-
     // If the user is in online "notify" that user with message
-    participants
-      .filter(
-        (participant) =>
-          ![userId, undefined].includes(participant.userDetail[0].userId),
-      )
-      .map((participant) =>
-        this.socketStore.getFromUser(participant.userDetail[0].userId),
-      )
-      .forEach((socket) => {
-        if (socket) socket.emit('message', sendMessage);
-      });
+    const emittedSockets = this.chatService.emitToFilteredSocket(
+      participants,
+      userId,
+      {
+        message: data.message,
+        createdAt: (messageInfo as any).createdAt,
+        new: conversation.lastMessage ? false : true,
+        group: participants.length > 1 ? true : false,
+        conversationId: conversationId,
+        userId: userId,
+      },
+    );
+
+    if (emittedSockets > 0)
+      await this.messageService.updateWhere(
+        {
+          conversation: new Types.ObjectId(conversationId),
+        },
+        {
+          messageStatus: MessageStatus.DELIVERED,
+        },
+      );
   }
 
   @SubscribeMessage('seenMessage')
