@@ -30,6 +30,7 @@ import type {
   CreateConversationDto,
   SendMessageDto,
   seenMessageDto,
+  // addParticipantsDto,
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
@@ -277,6 +278,9 @@ export class ChatGateway implements OnGatewayDisconnect {
             'userDetail.userId': { $ne: userId },
           },
         },
+        {
+          $sort: { createdAt: -1 },
+        },
       ]);
 
     if (!participants)
@@ -285,9 +289,19 @@ export class ChatGateway implements OnGatewayDisconnect {
         data: { message: 'Invalid conversation' },
       };
 
-    const messages = await this.messageService.findWhere({
-      conversation: conversation._id,
-    });
+    const messages = await this.messageService
+      .getRepository()
+      .find({ conversation: conversation._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    await this.messageService.getRepository().updateMany(
+      {
+        conversation: conversation._id,
+        _id: { $ne: messages[0]._id },
+      },
+      { $pull: { seenBy: userId } },
+    );
 
     await this.messageService.getRepository().updateOne(
       {
@@ -298,4 +312,62 @@ export class ChatGateway implements OnGatewayDisconnect {
       },
     );
   }
+  //
+  // @SubscribeMessage('addParticipants')
+  // async addParticipants(
+  //   @MessageBody() data: addParticipantsDto,
+  //   @ConnectedSocket() client: Socket,
+  // ) {
+  //   const currentUser = this.socketStore.getUserFromSocket(client.id);
+  //   if (!currentUser) {
+  //     return {
+  //       event: 'error',
+  //       data: { message: 'Initiate socket connection' },
+  //     };
+  //   }
+  //
+  //   const { userId, conversationId } = data;
+  //
+  //   // Check If conversationId exists
+  //   const conversation = await this.conversationService
+  //     .getRepository()
+  //     .findById(conversationId);
+  //   if (!conversation)
+  //     return {
+  //       event: 'error',
+  //       data: { message: 'No any conversation with such id found' },
+  //     };
+  //
+  //   // Get participants of conversation
+  //   const participants = await this.conversationPService
+  //     .getRepository()
+  //     .aggregate([
+  //       {
+  //         $match: {
+  //           conversation: new Types.ObjectId(conversationId as string),
+  //         },
+  //       },
+  //       {
+  //         $lookup: {
+  //           from: 'users',
+  //           localField: 'user',
+  //           foreignField: '_id',
+  //           as: 'userDetail',
+  //         },
+  //       },
+  //       {
+  //         $match: {
+  //           'userDetail.userId': { $ne: userId },
+  //         },
+  //       },
+  //     ]);
+  //
+  //   if (!participants)
+  //     return {
+  //       event: 'error',
+  //       data: { message: 'Invalid conversation' },
+  //     };
+  //
+  //   console.log('participants', participants);
+  // }
 }
