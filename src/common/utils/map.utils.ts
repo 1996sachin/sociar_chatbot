@@ -1,5 +1,5 @@
-export const getByValue = (map, searchValue) => {
-  for (let [key, value] of map) {
+export const getByValue = (map: Map<string, any>, searchValue: string) => {
+  for (const [key, value] of map) {
     if (value === searchValue) return key;
   }
 };
