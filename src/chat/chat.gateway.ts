@@ -114,10 +114,6 @@ export class ChatGateway implements OnGatewayDisconnect {
       userId,
     ];
 
-    //TODO: remove validator (Group needs to be done)
-    if (participants.length > 1)
-      return { event: 'error', data: { message: 'Too many participants' } };
-
     //Check if participants exists
     const userInfo = await this.userService.findWhere({
       userId: { $in: allParticipants },
