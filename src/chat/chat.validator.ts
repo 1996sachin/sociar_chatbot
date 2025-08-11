@@ -15,7 +15,7 @@ export const createConversationSchema = z
       .nonempty('Participants cannot be empty'),
   })
   .required();
-export type createConversationDto = z.infer<typeof createConversationSchema>;
+export type CreateConversationDto = z.infer<typeof createConversationSchema>;
 
 export const sendMessageSchema = z
   .object({
@@ -23,4 +23,4 @@ export const sendMessageSchema = z
     message: z.string(),
   })
   .required();
-export type sendMessageDto = z.infer<typeof sendMessageSchema>;
+export type SendMessageDto = z.infer<typeof sendMessageSchema>;
