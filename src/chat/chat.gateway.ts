@@ -35,6 +35,8 @@ import { CustomLogger } from 'src/config/custom.logger';
 
 const logger = new CustomLogger('Chat Gateway');
 
+
+
 @UseFilters(new SocketExceptionFilter())
 @WebSocketGateway({
   cors: {
