@@ -104,6 +104,12 @@ export class MessageService extends BaseService<MessageDocument> {
     const limitNum = limit ? parseInt(limit, 10) : 10;
     const offset = (pageNum - 1) * limitNum;
 
+    const requestBody = {
+      conversationId,
+      page,
+      limit,
+    };
+
     await this.getRepository().updateMany(
       {
         conversation: new Types.ObjectId(conversationId),
@@ -149,7 +155,6 @@ export class MessageService extends BaseService<MessageDocument> {
         { $project: { conversation: 0 } },
       ])
       .exec();
-
     return {
       message: 'Messages fetched',
       data: {

@@ -17,6 +17,9 @@ import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
 import { Types } from 'mongoose';
+import { CustomLogger } from 'src/config/custom.logger';
+
+const logger = new CustomLogger('Chat Gateway');
 
 interface InitializeChat {
   userId: string;
@@ -25,7 +28,6 @@ interface InitializeChat {
 interface CreateConversation {
   participants: string[];
 }
-
 interface SendMessage {
   conversationId: string;
   message: string;
@@ -53,6 +55,7 @@ export class ChatGateway implements OnGatewayDisconnect {
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
     console.log('disconnected', client.id);
+    logger.debug(`${client.id} has disconnected from the socket server`);
     this.socketStore.remove(client.id);
   }
 
@@ -62,6 +65,9 @@ export class ChatGateway implements OnGatewayDisconnect {
   ) {
     this.socketStore.remove(client.id);
     console.log('connected', client.id, data.userId);
+    logger.debug(
+      `${client.id} has connected to the socket server and their userId is ${data.userId}`,
+    );
     this.socketStore.add(data.userId, client.id, client);
     await this.userService.saveIfNotExists({ userId: data.userId });
   }
@@ -72,11 +78,12 @@ export class ChatGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     const userId = this.socketStore.getUserFromSocket(client.id);
-    if (!userId)
+    if (!userId) {
       return {
         event: 'error',
         data: { message: 'Initiate socket connection' },
       };
+    }
 
     const { participants } = data;
     if (participants.length > 1)

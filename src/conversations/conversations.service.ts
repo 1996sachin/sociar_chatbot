@@ -24,8 +24,8 @@ export class ConversationsService extends BaseService<ChatDocument> {
       userId: user,
     });
 
-    if (!userExists) {
-      throw new NotFoundException('No user with such userid found');
+    if (!userExists || userExists.length === 0) {
+      throw new NotFoundException('no user with such userid found');
     }
 
     const basePipeline = [
@@ -127,7 +127,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
       .skip(offset)
       .limit(limitNum)
       .exec();
-
     return {
       data: newData,
       pagination: {

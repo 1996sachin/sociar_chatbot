@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import mongoose, { Types } from 'mongoose';
-import { BadRequestException } from '@nestjs/common';
+import mongoose from 'mongoose';
 
 type NotFoundOptions = {
   model: mongoose.Model<any>;
@@ -10,12 +9,6 @@ type NotFoundOptions = {
 
 export function notFoundCheck({ model, field = '_id' }: NotFoundOptions) {
   return z.string().superRefine(async (value, ctx) => {
-    if (!Types.ObjectId.isValid(value)) {
-      throw new BadRequestException(
-        'Conversation id should be a valid object id',
-      );
-    }
-
     const exists = await model.exists({ [field]: value });
 
     if (!exists) {
