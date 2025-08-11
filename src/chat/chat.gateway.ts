@@ -37,9 +37,14 @@ interface InitializeChat {
 interface CreateConversation {
   participants: string[];
 }
+
 interface SendMessage {
   conversationId: string;
   message: string;
+}
+
+interface SeenMessage {
+  conversationId: string;
 }
 
 @UseFilters(new SocketExceptionFilter())
@@ -60,7 +65,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) {}
+  ) { }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -237,5 +242,81 @@ export class ChatGateway implements OnGatewayDisconnect {
       .forEach((socket) => {
         if (socket) socket.emit('message', sendMessage);
       });
+  }
+
+  @SubscribeMessage('seenMessage')
+  async seenMessage(
+    @MessageBody() data: SeenMessage,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = this.socketStore.getUserFromSocket(client.id);
+    if (!userId)
+      return {
+        event: 'error',
+        data: { message: 'Initiate socket connection' },
+      };
+
+    const { conversationId } = data;
+
+    // Check conversationId type
+    if (!Types.ObjectId.isValid(conversationId))
+      return {
+        event: 'error',
+        data: { message: 'Conversation id must be a valid object id' },
+      };
+
+    // Check If conversationId exists
+    const conversation = await this.conversationService
+      .getRepository()
+      .findById(conversationId);
+    if (!conversation)
+      return {
+        event: 'error',
+        data: { message: 'No any conversation with such id found' },
+      };
+
+    // Check If user is part of conversation
+    // Get participants of conversation
+    const participants = await this.conversationPService
+      .getRepository()
+      .aggregate([
+        {
+          $match: {
+            conversation: new Types.ObjectId(conversationId),
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'userDetail',
+          },
+        },
+        {
+          $match: {
+            'userDetail.userId': { $ne: userId },
+          },
+        },
+      ]);
+
+    if (!participants)
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' },
+      };
+
+    const messages = await this.messageService.findWhere({
+      conversation: conversation._id,
+    });
+
+    await this.messageService.getRepository().updateOne(
+      {
+        _id: messages[0]._id,
+      },
+      {
+        $addToSet: { seenStatus: userId },
+      },
+    );
   }
 }

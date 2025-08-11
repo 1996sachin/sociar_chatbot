@@ -18,9 +18,6 @@ import mongoose from 'mongoose';
 import { ApiQuery } from '@nestjs/swagger';
 import { UsersService } from 'src/users/users.service';
 import { ConversationsService } from 'src/conversations/conversations.service';
-import { CustomLogger } from 'src/config/custom.logger';
-
-const logger = new CustomLogger();
 
 @Controller('messages')
 export class MessagesController {
@@ -83,7 +80,6 @@ export class MessagesController {
       this.conversationService.getRepository(),
     ).safeParseAsync(data);
     if (!parsedData.success) {
-      logger.error(parsedData.error);
       throw new BadRequestException(parsedData.error.format());
     }
 
