@@ -24,7 +24,7 @@ export class Message {
   messageStatus: MessageStatus;
 
   @Prop({})
-  seenStatus: [];
+  seenBy: [];
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

@@ -29,13 +29,12 @@ import type {
   InitializeChatDto,
   CreateConversationDto,
   SendMessageDto,
+  seenMessageDto,
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
 
 const logger = new CustomLogger('Chat Gateway');
-
-
 
 @UseFilters(new SocketExceptionFilter())
 @WebSocketGateway({
@@ -232,7 +231,7 @@ export class ChatGateway implements OnGatewayDisconnect {
 
   @SubscribeMessage('seenMessage')
   async seenMessage(
-    @MessageBody() data: SeenMessage,
+    @MessageBody() data: seenMessageDto,
     @ConnectedSocket() client: Socket,
   ) {
     const userId = this.socketStore.getUserFromSocket(client.id);
@@ -244,13 +243,6 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     const { conversationId } = data;
 
-    // Check conversationId type
-    if (!Types.ObjectId.isValid(conversationId))
-      return {
-        event: 'error',
-        data: { message: 'Conversation id must be a valid object id' },
-      };
-
     // Check If conversationId exists
     const conversation = await this.conversationService
       .getRepository()
@@ -261,7 +253,6 @@ export class ChatGateway implements OnGatewayDisconnect {
         data: { message: 'No any conversation with such id found' },
       };
 
-    // Check If user is part of conversation
     // Get participants of conversation
     const participants = await this.conversationPService
       .getRepository()
@@ -301,7 +292,7 @@ export class ChatGateway implements OnGatewayDisconnect {
         _id: messages[0]._id,
       },
       {
-        $addToSet: { seenStatus: userId },
+        $addToSet: { seenBy: userId },
       },
     );
   }

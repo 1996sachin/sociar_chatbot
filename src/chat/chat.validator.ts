@@ -24,3 +24,8 @@ export const sendMessageSchema = z
   })
   .required();
 export type SendMessageDto = z.infer<typeof sendMessageSchema>;
+
+export const seenMessageSchema = z.object({
+  conversationId: isValidObjectId(),
+});
+export type seenMessageDto = z.infer<typeof seenMessageSchema>;
