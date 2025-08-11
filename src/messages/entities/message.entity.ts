@@ -22,6 +22,9 @@ export class Message {
 
   @Prop({ required: true, enum: MessageStatus })
   messageStatus: MessageStatus;
+
+  @Prop({})
+  seenBy: [];
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
