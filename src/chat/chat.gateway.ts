@@ -9,6 +9,7 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { SocketStore } from './socket.store';
@@ -17,6 +18,14 @@ import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
 import { Types } from 'mongoose';
+import { UseFilters } from '@nestjs/common';
+import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
+import {
+  createConversationSchema,
+  initializeChatSchema,
+  sendMessageSchema,
+} from './chat.validator';
+import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
 
 const logger = new CustomLogger('Chat Gateway');
@@ -33,6 +42,7 @@ interface SendMessage {
   message: string;
 }
 
+@UseFilters(new SocketExceptionFilter())
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -50,7 +60,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) { }
+  ) {}
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -59,8 +69,15 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.socketStore.remove(client.id);
   }
 
-  @SubscribeMessage('init') async init(
-    @MessageBody() data: InitializeChat,
+  @SubscribeMessage('init')
+  async init(
+    @MessageBody(
+      new ZodValidationPipe(
+        initializeChatSchema,
+        (error) => new WsException({ event: 'error', data: error }),
+      ),
+    )
+    data: InitializeChat,
     @ConnectedSocket() client: Socket,
   ) {
     this.socketStore.remove(client.id);
@@ -74,7 +91,13 @@ export class ChatGateway implements OnGatewayDisconnect {
 
   @SubscribeMessage('createConversation')
   async createConversation(
-    @MessageBody() data: CreateConversation,
+    @MessageBody(
+      new ZodValidationPipe(
+        createConversationSchema,
+        (error) => new WsException({ event: 'error', data: error }),
+      ),
+    )
+    data: CreateConversation,
     @ConnectedSocket() client: Socket,
   ) {
     const userId = this.socketStore.getUserFromSocket(client.id);
@@ -86,72 +109,32 @@ export class ChatGateway implements OnGatewayDisconnect {
     }
 
     const { participants } = data;
-    if (participants.length > 1)
-      return { event: 'error', data: { message: 'Too many participants' } };
-
     const allParticipants = [
       ...participants.map((parti) => parti.toString()),
       userId,
     ];
-    if (participants.length <= 0)
-      return {
-        event: 'error',
-        data: { message: 'Empty participants' },
-      };
+
+    //TODO: remove validator (Group needs to be done)
+    if (participants.length > 1)
+      return { event: 'error', data: { message: 'Too many participants' } };
 
     //Check if participants exists
     const userInfo = await this.userService.findWhere({
       userId: { $in: allParticipants },
     });
-    let newUserInfo;
+
+    const allUserInfo = [...userInfo];
     if (allParticipants.length !== userInfo.length) {
-      const newUsers = allParticipants.filter((participant) =>
-        userInfo.find((user) => user.userId !== participant),
+      const addNewUsers = await this.userService.addNewUsers(
+        allParticipants,
+        userInfo,
       );
-      newUserInfo = await this.userService.saveMany(
-        newUsers.map((newUser) => ({
-          userId: newUser,
-        })),
-      );
-      // return {
-      //   event: 'error',
-      //   data: { message: 'Invalid participants' },
-      // };
+      allUserInfo.push(...(addNewUsers as any[]));
     }
 
     //Validate If conversation of same participants exists
-    const conversationParticipants = await this.conversationPService
-      .getRepository()
-      .aggregate([
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'user',
-            foreignField: '_id',
-            as: 'userDetails',
-          },
-        },
-        { $unwind: '$userDetails' },
-        {
-          $match: { 'userDetails.userId': { $in: allParticipants } },
-        },
-        {
-          $group: {
-            _id: '$conversation',
-            userDetails: { $push: '$userDetails' },
-            userIds: { $addToSet: '$userDetails.userId' },
-          },
-        },
-        { $match: { $expr: { $setEquals: ['$userIds', allParticipants] } } },
-        {
-          $project: {
-            _id: 0,
-            conversation: '$_id',
-            userDetails: 1,
-            userIds: 1,
-          },
-        },
-      ]);
+    const conversationParticipants =
+      await this.conversationPService.getPastConversation(allParticipants);
     if (conversationParticipants.length > 0)
       return {
         event: 'conversationInfo',
@@ -161,12 +144,10 @@ export class ChatGateway implements OnGatewayDisconnect {
     const conversation = await this.conversationService.save({});
 
     const conversationParticipant = await this.conversationPService.saveMany(
-      [...userInfo, ...(newUserInfo?.length ? newUserInfo : [])].map(
-        (participant) => ({
-          conversation: new Types.ObjectId(conversation.id),
-          user: participant._id,
-        }),
-      ),
+      allUserInfo.map((participant) => ({
+        conversation: new Types.ObjectId(conversation.id),
+        user: participant._id,
+      })),
     );
 
     // Update in conversation with participants
@@ -183,7 +164,13 @@ export class ChatGateway implements OnGatewayDisconnect {
 
   @SubscribeMessage('sendMessage')
   async sendMessage(
-    @MessageBody() data: SendMessage,
+    @MessageBody(
+      new ZodValidationPipe(
+        sendMessageSchema,
+        (error) => new WsException({ event: 'error', data: error }),
+      ),
+    )
+    data: SendMessage,
     @ConnectedSocket() client: Socket,
   ) {
     // Get userId from socket
@@ -196,13 +183,6 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     const { conversationId, message } = data;
 
-    // Check conversationId type
-    if (!Types.ObjectId.isValid(conversationId))
-      return {
-        event: 'error',
-        data: { message: 'Invalid conversation' },
-      };
-
     // Check If conversationId exists
     const conversation = await this.conversationService
       .getRepository()
@@ -213,31 +193,12 @@ export class ChatGateway implements OnGatewayDisconnect {
         data: { message: 'Invalid conversation' },
       };
 
-    // Check If user is part of conversation
-    // Get participants of conversation
-    const participants = await this.conversationPService
-      .getRepository()
-      .aggregate([
-        {
-          $match: {
-            conversation: new Types.ObjectId(conversationId),
-          },
-        },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'user',
-            foreignField: '_id',
-            as: 'userDetail',
-          },
-        },
-        {
-          $match: {
-            'userDetail.userId': { $ne: userId },
-          },
-        },
-      ]);
-
+    // Get participants & Check If user is part of conversation
+    const participants =
+      await this.conversationPService.getParticipantsExcludingSelf(
+        conversationId,
+        userId,
+      );
     if (!participants)
       return {
         event: 'error',
@@ -245,8 +206,6 @@ export class ChatGateway implements OnGatewayDisconnect {
       };
 
     const user = await this.userService.findWhere({ userId });
-
-    // Add message to db
     const messageInfo = await this.messageService.save({
       conversation: new Types.ObjectId(conversationId),
       content: message, // Crypt
@@ -258,26 +217,25 @@ export class ChatGateway implements OnGatewayDisconnect {
       lastMessage: message,
     });
 
+    const sendMessage = {
+      message: data.message,
+      createdAt: (messageInfo as any).createdAt,
+      new: conversation.lastMessage ? false : true,
+      conversationId: conversationId,
+      userId: userId,
+    };
+
     // If the user is in online "notify" that user with message
     participants
       .filter(
         (participant) =>
-          ![this.socketStore.getUserFromSocket(client.id), undefined].includes(
-            participant.userDetail[0].userId,
-          ),
+          ![userId, undefined].includes(participant.userDetail[0].userId),
       )
-      .map((participant: any) =>
+      .map((participant) =>
         this.socketStore.getFromUser(participant.userDetail[0].userId),
       )
       .forEach((socket) => {
-        if (socket)
-          socket.emit('message', {
-            message: data.message,
-            createdAt: (messageInfo as any).createdAt,
-            new: conversation.lastMessage ? false : true,
-            conversationId: conversationId,
-            userId: userId,
-          });
+        if (socket) socket.emit('message', sendMessage);
       });
   }
 }

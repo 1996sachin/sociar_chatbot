@@ -12,4 +12,22 @@ export class UsersService extends BaseService<UserDocument> {
   ) {
     super(UserModel);
   }
+  async addNewUsers(allParticipants: string[], userInfo: { userId: string }[]) {
+    // Find participants not already in userInfo
+    const newUsers = allParticipants.filter(
+      (participant) => !userInfo.some((user) => user.userId === participant),
+    );
+
+    if (newUsers.length === 0) {
+      return [];
+    }
+
+    const newUserInfo = await this.saveMany(
+      newUsers.map((newUserId) => ({
+        userId: newUserId,
+      })),
+    );
+
+    return newUserInfo;
+  }
 }
