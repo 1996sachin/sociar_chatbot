@@ -16,7 +16,6 @@ export const createConversationSchema = z
   })
   .required();
 export type CreateConversationDto = z.infer<typeof createConversationSchema>;
-export type CreateConversationDto = z.infer<typeof createConversationSchema>;
 
 export const sendMessageSchema = z
   .object({

@@ -211,6 +211,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       message: data.message,
       createdAt: (messageInfo as any).createdAt,
       new: conversation.lastMessage ? false : true,
+      group: participants.length > 1 ? true : false,
       conversationId: conversationId,
       userId: userId,
     };
