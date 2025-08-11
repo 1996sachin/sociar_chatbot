@@ -1,17 +1,13 @@
-import { Body, Inject, Injectable, Logger } from '@nestjs/common';
+import { Body, Inject, Injectable } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/common/service/base.service';
 import { MessageDocument, Message } from './entities/message.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
-import { CustomLogger } from 'src/config/custom.logger';
-
-const logger = new CustomLogger('Message Service');
 
 @Injectable()
 export class MessageService extends BaseService<MessageDocument> {
-  private readonly logger = new Logger(Message.name);
   constructor(
     @InjectModel(Message.name)
     private readonly MessageModel: Model<MessageDocument>,
@@ -34,7 +30,6 @@ export class MessageService extends BaseService<MessageDocument> {
     },
   ) {
     let { senderId, recieverId, content, conversationId } = body;
-    logger.debug(body);
 
     const conversationExists =
       await this.ConversationService.find(conversationId);
@@ -115,8 +110,6 @@ export class MessageService extends BaseService<MessageDocument> {
       limit,
     };
 
-    logger.logRequest(requestBody);
-
     await this.getRepository().updateMany(
       {
         conversation: new Types.ObjectId(conversationId),
@@ -162,7 +155,6 @@ export class MessageService extends BaseService<MessageDocument> {
         { $project: { conversation: 0 } },
       ])
       .exec();
-    logger.logResponse(newData);
     return {
       message: 'Messages fetched',
       data: {
