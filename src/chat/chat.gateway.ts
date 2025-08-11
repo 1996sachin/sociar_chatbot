@@ -79,7 +79,6 @@ export class ChatGateway implements OnGatewayDisconnect {
   ) {
     const userId = this.socketStore.getUserFromSocket(client.id);
     if (!userId) {
-      logger.warn('Initiate a socket connection first');
       return {
         event: 'error',
         data: { message: 'Initiate socket connection' },
