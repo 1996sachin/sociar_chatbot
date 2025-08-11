@@ -25,22 +25,15 @@ import {
   initializeChatSchema,
   sendMessageSchema,
 } from './chat.validator';
+import type {
+  InitializeChatDto,
+  CreateConversationDto,
+  SendMessageDto,
+} from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
 
 const logger = new CustomLogger('Chat Gateway');
-
-interface InitializeChat {
-  userId: string;
-}
-
-interface CreateConversation {
-  participants: string[];
-}
-interface SendMessage {
-  conversationId: string;
-  message: string;
-}
 
 @UseFilters(new SocketExceptionFilter())
 @WebSocketGateway({
@@ -77,7 +70,7 @@ export class ChatGateway implements OnGatewayDisconnect {
         (error) => new WsException({ event: 'error', data: error }),
       ),
     )
-    data: InitializeChat,
+    data: InitializeChatDto,
     @ConnectedSocket() client: Socket,
   ) {
     this.socketStore.remove(client.id);
@@ -97,7 +90,7 @@ export class ChatGateway implements OnGatewayDisconnect {
         (error) => new WsException({ event: 'error', data: error }),
       ),
     )
-    data: CreateConversation,
+    data: CreateConversationDto,
     @ConnectedSocket() client: Socket,
   ) {
     const userId = this.socketStore.getUserFromSocket(client.id);
@@ -166,7 +159,7 @@ export class ChatGateway implements OnGatewayDisconnect {
         (error) => new WsException({ event: 'error', data: error }),
       ),
     )
-    data: SendMessage,
+    data: SendMessageDto,
     @ConnectedSocket() client: Socket,
   ) {
     // Get userId from socket
