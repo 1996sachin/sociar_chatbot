@@ -13,7 +13,7 @@ import { ApiQuery } from '@nestjs/swagger';
 
 @Controller('conversations')
 export class ConversationsController {
-  constructor(private readonly conversationsService: ConversationsService) {}
+  constructor(private readonly conversationsService: ConversationsService) { }
 
   @Post()
   async create(@Body() body: unknown): Promise<{ message: string; data: any }> {

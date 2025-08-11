@@ -1,5 +1,6 @@
 import { Model } from 'mongoose';
-import { notFoundCheck } from 'src/common/rules/not-found';
+import { notFoundCheck } from 'src/common/rules/not-found.rule';
+import { isValidObjectId } from 'src/common/rules/valid-objectid.rule';
 import { ChatDocument } from 'src/conversations/entities/conversation.entity';
 import { UserDocument } from 'src/users/entities/user.entity';
 import * as z from 'zod';
@@ -27,33 +28,13 @@ export const updateMessageValidator = z.object({
 
 export const fetchMessageValidator = (ConversationModel: Model<ChatDocument>) =>
   z.object({
-    conversationId: notFoundCheck({
-      model: ConversationModel,
-      field: '_id',
-      message: 'Conversation does not exists',
-    }),
+    conversationId: isValidObjectId().pipe(
+      notFoundCheck({
+        model: ConversationModel,
+        field: '_id',
+        message: 'Conversation does not exists',
+      }),
+    ),
     page: z.string().optional(),
     limit: z.string().optional(),
-  }); // .superRefine(async (data, ctx) => {
-//   if (!Types.ObjectId.isValid(data.conversationId)) {
-//     ctx.addIssue({
-//       path: ['conversationId'],
-//       code: 'custom',
-//       message: 'conversation id is not a valid object id',
-//     });
-//     throw new BadRequestException(
-//       'conversation id should be a valid object id',
-//     );
-//   }
-//
-//   const conversationExists = await ConversationModel.findById(
-//     data.conversationId,
-//   );
-//   if (!conversationExists) {
-//     ctx.addIssue({
-//       path: ['conversationId'],
-//       code: 'custom',
-//       message: 'no such conversation with such id found',
-//     });
-//   }
-// });
+  });

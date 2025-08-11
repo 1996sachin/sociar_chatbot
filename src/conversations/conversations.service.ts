@@ -4,6 +4,9 @@ import { BaseService } from 'src/common/service/base.service';
 import { ChatDocument, Conversation } from './entities/conversation.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { UsersService } from 'src/users/users.service';
+import { CustomLogger } from 'src/config/custom.logger';
+
+const logger = new CustomLogger('Conversation Service');
 
 @Injectable()
 export class ConversationsService extends BaseService<ChatDocument> {
@@ -24,8 +27,17 @@ export class ConversationsService extends BaseService<ChatDocument> {
       userId: user,
     });
 
-    if (!userExists) {
-      throw new NotFoundException('No user with such userid found');
+    const reqBody = {
+      user,
+      page,
+      limit,
+    };
+
+    logger.logRequest(reqBody);
+
+    if (!userExists || userExists.length === 0) {
+      logger.error(`No any user with userId ${user} found`);
+      throw new NotFoundException('no user with such userid found');
     }
 
     const basePipeline = [
@@ -127,7 +139,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       .skip(offset)
       .limit(limitNum)
       .exec();
-
+    logger.logResponse(newData);
     return {
       data: newData,
       pagination: {
