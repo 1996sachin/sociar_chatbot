@@ -39,7 +39,7 @@ import { MessageStatus } from 'src/messages/entities/message.entity';
 const logger = new CustomLogger('Chat Gateway');
 
 @UseFilters(new SocketExceptionFilter())
-@WebSocketGateway({
+@WebSocketGateway(Number(process.env.PORT!), {
   cors: {
     origin: '*',
     methods: ['GET', 'POST'],
