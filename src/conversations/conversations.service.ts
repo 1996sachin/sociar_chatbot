@@ -34,14 +34,9 @@ export class ConversationsService extends BaseService<ChatDocument> {
     }
 
     const basePipeline = [
-      // Lookup all participants with their user info in one go
-
       {
-        $match: {
-          lastMessage: { $ne: undefined },
-        },
+        $match: { lastMessage: { $ne: undefined } },
       },
-
       {
         $lookup: {
           from: 'conversationparticipants',
@@ -50,9 +45,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
           as: 'participantDetails',
         },
       },
-      {
-        $unwind: '$participantDetails',
-      },
+      { $unwind: '$participantDetails' },
       {
         $lookup: {
           from: 'users',
@@ -61,11 +54,15 @@ export class ConversationsService extends BaseService<ChatDocument> {
           as: 'participantDetails.userInfo',
         },
       },
+      { $unwind: '$participantDetails.userInfo' },
       {
-        $unwind: '$participantDetails.userInfo',
+        $lookup: {
+          from: 'messages',
+          localField: '_id',
+          foreignField: 'conversation',
+          as: 'messages',
+        },
       },
-
-      // Group back by conversation, reconstruct participant list
       {
         $group: {
           _id: '$_id',
@@ -79,8 +76,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
           },
         },
       },
-
-      // Move fields back to top level
       {
         $replaceRoot: {
           newRoot: {
@@ -88,27 +83,55 @@ export class ConversationsService extends BaseService<ChatDocument> {
           },
         },
       },
-
-      // Filter to only conversations where the user is one of the participants
       {
-        $match: {
-          'participants.userId': user,
+        $match: { 'participants.userId': '2' },
+      },
+      {
+        // Find latest "seen" timestamp for user '2'
+        $addFields: {
+          lastSeenDate: {
+            $getField: {
+              field: 'createdAt',
+              input: {
+                $first: {
+                  $filter: {
+                    input: '$messages',
+                    as: 'm',
+                    cond: { $in: ['2', '$$m.seenBy'] },
+                  },
+                },
+              },
+            },
+          },
         },
       },
-
-      // Project other participants (excluding self)
       {
         $addFields: {
           otherParticipants: {
             $filter: {
               input: '$participants',
               as: 'p',
-              cond: { $ne: ['$$p.userId', user] },
+              cond: { $ne: ['$$p.userId', '2'] },
+            },
+          },
+          unreadCount: {
+            $size: {
+              $filter: {
+                input: '$messages',
+                as: 'msg',
+                cond: {
+                  $and: [
+                    { $not: { $in: ['2', '$$msg.seenBy'] } },
+                    {
+                      $gt: ['$$msg.createdAt', '$lastSeenDate'],
+                    },
+                  ],
+                },
+              },
             },
           },
         },
       },
-      // { $unwind: '$otherParticipants' },
     ];
     const totalCountResult = await this.getRepository()
       .aggregate([...basePipeline, { $count: 'total' }])
@@ -125,6 +148,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
             userId: '$otherParticipants.userId',
             lastMessage: -1,
             updatedAt: -1,
+            unreadCount: 1,
           },
         },
         { $sort: { updatedAt: -1 } },
