@@ -7,6 +7,12 @@ export enum MessageStatus {
   READ = 'read',
 }
 
+export enum MessageTypes {
+  LOG = 'log',
+  TEXT = 'text',
+  MEDIA = 'media',
+}
+
 export type MessageDocument = Message & Document;
 
 @Schema({ timestamps: true })
@@ -25,6 +31,9 @@ export class Message {
 
   @Prop({})
   seenBy: [];
+
+  @Prop({ default: MessageTypes.TEXT })
+  messageType: MessageTypes;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);

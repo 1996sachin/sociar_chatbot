@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Model } from 'mongoose';
 import { BaseService } from 'src/common/service/base.service';
 import { ChatDocument, Conversation } from './entities/conversation.entity';
@@ -136,5 +141,15 @@ export class ConversationsService extends BaseService<ChatDocument> {
         perPage: limitNum,
       },
     };
+  }
+
+  async updateConversaton(conversationId: string, data: { name: string }) {
+    const isConversationGroup = await this.find(conversationId);
+
+    if (isConversationGroup!.participants.length <= 2) {
+      throw new BadRequestException(
+        'Conversation must have more than two participants inorder to be a group conversation',
+      );
+    }
   }
 }

@@ -6,9 +6,13 @@ import {
   BadRequestException,
   Query,
   Param,
+  Patch,
 } from '@nestjs/common';
 import { ConversationsService } from './conversations.service';
-import { createConversationValidator } from './conversation.validator';
+import {
+  createConversationValidator,
+  updateConversationValidator,
+} from './conversation.validator';
 import { ApiQuery } from '@nestjs/swagger';
 
 @Controller('conversations')
@@ -49,5 +53,23 @@ export class ConversationsController {
     @Query('limit') limit: string = '10',
   ) {
     return this.conversationsService.fetchConversations(id, page, limit);
+  }
+
+  // endpoint for renaming the conversation
+  @Patch(':conversationId')
+  updateConversation(
+    @Param('conversationId') conversationId: string,
+    @Body()
+    body: {
+      name: string;
+    },
+  ) {
+    const data = { conversationId, body };
+    const parsedData = updateConversationValidator(
+      this.conversationsService.getRepository(),
+    ).parseAsync(data);
+    console.log(parsedData);
+
+    return this.conversationsService.update(conversationId, body);
   }
 }

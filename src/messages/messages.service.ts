@@ -144,7 +144,7 @@ export class MessageService extends BaseService<MessageDocument> {
           $unset: 'userId', // Remove the lookup field
         },
         {
-          $sort: { updatedAt: -1, createdAt: -1 },
+          $sort: { createdAt: -1 },
         },
         {
           $skip: offset,
