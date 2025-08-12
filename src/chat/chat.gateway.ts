@@ -17,7 +17,7 @@ import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
 import { Types } from 'mongoose';
-import { BadRequestException, UseFilters } from '@nestjs/common';
+import { UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
   createConversationSchema,
@@ -390,36 +390,83 @@ export class ChatGateway implements OnGatewayDisconnect {
         data: { message: 'Invalid conversation' },
       };
     }
-    const participantPartOfConv = await this.conversationPService.findWhere({
-      conversation: new Types.ObjectId(conversationId),
-      user: participantDetails._id,
-    });
 
-    if (participantPartOfConv.length !== 0) {
-      return {
-        event: 'warning',
-        message: 'participant is already part of this conversation',
-      };
+    // if group adding the new participant
+    if (participants.length > 2) {
+      const participantPartOfConv = await this.conversationPService.findWhere({
+        conversation: new Types.ObjectId(conversationId),
+        user: participantDetails._id,
+      });
+
+      if (participantPartOfConv.length !== 0) {
+        return {
+          event: 'warning',
+          message: 'participant is already part of this conversation',
+        };
+      }
+
+      const newParticipant = await this.conversationPService.save({
+        conversation: new Types.ObjectId(conversationId),
+        user: participantDetails._id,
+      });
+
+      await this.conversationService.getRepository().updateOne(
+        { _id: conversationId },
+        {
+          $addToSet: { participants: newParticipant._id },
+        },
+      );
+
+      await this.messageService.save({
+        conversation: new Types.ObjectId(conversationId),
+        sender: currentUserDetails._id,
+        content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
+        messageType: 'log',
+        messageStatus: 'delivered',
+      });
+    } else {
+
+      // creating a new conversation if personal msg
+      const newConversation = await this.conversationService.getRepository().create({
+      })
+
+      if (!newConversation) {
+        return {
+          event: 'warning',
+          message: "something went wrong while creating the conversation"
+        }
+      }
+
+      const oldParticipants = participants.map((p) => ({
+        _id: new Types.ObjectId(),
+        conversation: new Types.ObjectId(String(newConversation._id)),
+        user: p.user
+      }))
+
+      if (!oldParticipants.some(p => p.user.equals(participantDetails._id))) {
+        oldParticipants.push({
+          _id: new Types.ObjectId(),
+          conversation: new Types.ObjectId(String(newConversation._id)),
+          user: new Types.ObjectId(String(participantDetails._id)),
+        })
+      }
+
+      await this.conversationPService.getRepository().insertMany(oldParticipants)
+
+      await this.conversationService.getRepository().updateOne({
+        _id: newConversation._id
+      }, {
+        $set: { participants: oldParticipants.map(x => x._id) }
+      })
+
+      await this.messageService.save({
+        conversation: new Types.ObjectId(String(newConversation._id)),
+        sender: currentUserDetails._id,
+        content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
+        messageType: 'log',
+        messageStatus: 'delivered',
+      });
+
     }
-
-    const newParticipant = await this.conversationPService.save({
-      conversation: new Types.ObjectId(conversationId),
-      user: participantDetails._id,
-    });
-
-    await this.conversationService.getRepository().updateOne(
-      { _id: conversationId },
-      {
-        $addToSet: { participants: newParticipant._id },
-      },
-    );
-
-    await this.messageService.save({
-      conversation: new Types.ObjectId(conversationId),
-      sender: currentUserDetails._id,
-      content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
-      messageType: 'log',
-      messageStatus: 'delivered',
-    });
   }
 }
