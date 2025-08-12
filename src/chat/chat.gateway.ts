@@ -185,7 +185,6 @@ export class ChatGateway implements OnGatewayDisconnect {
       await this.conversationPService.getParticipantsUserDetails(
         conversationId,
       );
-    console.log('participants', participants);
     if (!participants)
       return {
         event: 'error',
@@ -198,6 +197,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       content: message, // Crypt
       messageStatus: MessageStatus.SENT,
       sender: new Types.ObjectId(user[0].id),
+      seenBy: [userId],
     });
 
     await this.conversationService.update(conversationId, {
@@ -291,13 +291,22 @@ export class ChatGateway implements OnGatewayDisconnect {
       conversation: conversation._id,
     });
 
-    await this.messageService.getRepository().updateOne(
-      {
-        _id: messages[0]._id,
-      },
-      {
-        $addToSet: { seenBy: userId },
-      },
-    );
+    const updatedMessage = await this.messageService
+      .getRepository()
+      .findOneAndUpdate(
+        {
+          _id: messages[0]._id,
+        },
+        {
+          $addToSet: { seenBy: userId },
+        },
+        { new: true },
+      );
+
+    this.chatService.emitToSocket('statusUpdate', participants, {
+      conversationId: conversationId,
+      messageId: messages[0]._id,
+      seenBy: updatedMessage!.seenBy,
+    });
   }
 }
