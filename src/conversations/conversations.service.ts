@@ -103,7 +103,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
           },
         },
       },
-      { $unwind: '$otherParticipants' },
+      // { $unwind: '$otherParticipants' },
     ];
     const totalCountResult = await this.getRepository()
       .aggregate([...basePipeline, { $count: 'total' }])
