@@ -74,9 +74,6 @@ export class ConversationParticipantService extends BaseService<ConversationPart
       },
       { $unwind: '$userDetails' },
       {
-        $match: { 'userDetails.userId': { $in: allParticipants } },
-      },
-      {
         $group: {
           _id: '$conversation',
           userDetails: { $push: '$userDetails' },
