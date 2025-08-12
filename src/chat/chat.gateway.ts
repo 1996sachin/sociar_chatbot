@@ -216,6 +216,9 @@ export class ChatGateway implements OnGatewayDisconnect {
         group: participants.length > 2 ? true : false,
         conversationId: conversationId,
         userId: userId,
+        participants: participants.map(
+          (participant) => participant.userDetail[0].userId,
+        ),
       },
     );
 
