@@ -17,9 +17,10 @@ import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
 import { Types } from 'mongoose';
-import { BadRequestException, UseFilters } from '@nestjs/common';
+import { UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
+  // addParticipantsSchema,
   createConversationSchema,
   initializeChatSchema,
   sendMessageSchema,
@@ -200,6 +201,9 @@ export class ChatGateway implements OnGatewayDisconnect {
       seenBy: [userId],
     });
 
+    // for removing the previous seen status in the message after pushing a new message
+    await this.messageService.seenMessage(conversationId, userId)
+
     await this.conversationService.update(conversationId, {
       lastMessage: message,
     });
@@ -299,7 +303,13 @@ export class ChatGateway implements OnGatewayDisconnect {
 
   @SubscribeMessage('addParticipants')
   async addParticipants(
-    @MessageBody() data: addParticipantsDto,
+    @MessageBody(
+      // new ZodValidationPipe(
+      //   this.conversationService.getRepository(),
+      //   this.userService.getRepository(),
+      //   (error) => new WsException({ event: 'error', data: error })
+    )
+    data: addParticipantsDto,
     @ConnectedSocket() client: Socket,
   ) {
     const currentUser = this.socketStore.getUserFromSocket(client.id);
