@@ -17,7 +17,7 @@ import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
 import { Types } from 'mongoose';
-import { UseFilters } from '@nestjs/common';
+import { BadRequestException, UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
   createConversationSchema,
