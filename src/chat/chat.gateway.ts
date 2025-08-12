@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -18,7 +17,7 @@ import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
 import { Types } from 'mongoose';
-import { UseFilters } from '@nestjs/common';
+import { BadRequestException, UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
   createConversationSchema,
@@ -30,7 +29,7 @@ import type {
   CreateConversationDto,
   SendMessageDto,
   seenMessageDto,
-  // addParticipantsDto,
+  addParticipantsDto,
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
@@ -58,7 +57,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) {}
+  ) { }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -312,62 +311,115 @@ export class ChatGateway implements OnGatewayDisconnect {
       },
     );
   }
-  //
-  // @SubscribeMessage('addParticipants')
-  // async addParticipants(
-  //   @MessageBody() data: addParticipantsDto,
-  //   @ConnectedSocket() client: Socket,
-  // ) {
-  //   const currentUser = this.socketStore.getUserFromSocket(client.id);
-  //   if (!currentUser) {
-  //     return {
-  //       event: 'error',
-  //       data: { message: 'Initiate socket connection' },
-  //     };
-  //   }
-  //
-  //   const { userId, conversationId } = data;
-  //
-  //   // Check If conversationId exists
-  //   const conversation = await this.conversationService
-  //     .getRepository()
-  //     .findById(conversationId);
-  //   if (!conversation)
-  //     return {
-  //       event: 'error',
-  //       data: { message: 'No any conversation with such id found' },
-  //     };
-  //
-  //   // Get participants of conversation
-  //   const participants = await this.conversationPService
-  //     .getRepository()
-  //     .aggregate([
-  //       {
-  //         $match: {
-  //           conversation: new Types.ObjectId(conversationId as string),
-  //         },
-  //       },
-  //       {
-  //         $lookup: {
-  //           from: 'users',
-  //           localField: 'user',
-  //           foreignField: '_id',
-  //           as: 'userDetail',
-  //         },
-  //       },
-  //       {
-  //         $match: {
-  //           'userDetail.userId': { $ne: userId },
-  //         },
-  //       },
-  //     ]);
-  //
-  //   if (!participants)
-  //     return {
-  //       event: 'error',
-  //       data: { message: 'Invalid conversation' },
-  //     };
-  //
-  //   console.log('participants', participants);
-  // }
+
+  @SubscribeMessage('addParticipants')
+  async addParticipants(
+    @MessageBody() data: addParticipantsDto,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const currentUser = this.socketStore.getUserFromSocket(client.id);
+    if (!currentUser) {
+      return {
+        event: 'error',
+        data: { message: 'Initiate socket connection' },
+      };
+    }
+
+    const { participantId, conversationId } = data;
+
+    const currentUserDetails = await this.userService.getRepository().findOne({
+      userId: currentUser,
+    });
+
+    if (!currentUserDetails) {
+      return {
+        event: 'warning',
+        message: 'No such user found',
+      };
+    }
+
+    // Check If conversationId exists
+    const conversation = await this.conversationService
+      .getRepository()
+      .findById(conversationId);
+    if (!conversation)
+      return {
+        event: 'error',
+        data: { message: 'No any conversation with such id found' },
+      };
+
+    // finding mongoose userId of the user
+    const participantDetails = await this.userService.getRepository().findOne({
+      userId: participantId,
+    });
+
+    if (!participantDetails) {
+      return {
+        event: "warning",
+        message: "no such user found"
+      }
+    }
+
+    // Get participants of conversation
+    const participants = await this.conversationPService
+      .getRepository()
+      .aggregate([
+        {
+          $match: {
+            conversation: new Types.ObjectId(conversationId),
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'userDetail',
+          },
+        },
+        {
+          $match: {
+            'userDetail.userId': { $ne: participantId },
+          },
+        },
+      ]);
+
+    if (!participants || participants.length === 0) {
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' },
+      };
+    }
+    const participantPartOfConv = await this.conversationPService.findWhere({
+      conversation: new Types.ObjectId(conversationId),
+      user: participantDetails._id,
+    });
+
+    if (participantPartOfConv.length !== 0) {
+      return {
+        event: 'warning',
+        message: 'participant is already part of this conversation',
+      };
+    }
+
+    const newParticipant = await this.conversationPService.save({
+      conversation: new Types.ObjectId(conversationId),
+      user: participantDetails._id,
+    });
+
+    await this.conversationService.getRepository().updateOne(
+      { _id: conversationId },
+      {
+        $addToSet: { participants: newParticipant._id },
+      },
+    );
+
+    await this.messageService.save({
+      conversation: new Types.ObjectId(conversationId),
+      sender: currentUserDetails._id,
+      content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
+      messageType: 'log',
+      messageStatus: 'delivered',
+    });
+  }
 }
