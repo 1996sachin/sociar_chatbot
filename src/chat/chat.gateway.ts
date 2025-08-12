@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -18,7 +17,7 @@ import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
 import { Types } from 'mongoose';
-import { UseFilters } from '@nestjs/common';
+import { BadRequestException, UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
   createConversationSchema,
@@ -30,6 +29,7 @@ import type {
   CreateConversationDto,
   SendMessageDto,
   seenMessageDto,
+  addParticipantsDto,
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
@@ -57,7 +57,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) {}
+  ) { }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -282,6 +282,9 @@ export class ChatGateway implements OnGatewayDisconnect {
             'userDetail.userId': { $ne: userId },
           },
         },
+        {
+          $sort: { createdAt: -1 },
+        },
       ]);
 
     if (!participants)
@@ -290,26 +293,165 @@ export class ChatGateway implements OnGatewayDisconnect {
         data: { message: 'Invalid conversation' },
       };
 
-    const messages = await this.messageService.findWhere({
-      conversation: conversation._id,
+    // using the seen logic from the message service
+    await this.messageService.seenMessage(conversation._id as string, userId)
+  }
+
+  @SubscribeMessage('addParticipants')
+  async addParticipants(
+    @MessageBody() data: addParticipantsDto,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const currentUser = this.socketStore.getUserFromSocket(client.id);
+    if (!currentUser) {
+      return {
+        event: 'error',
+        data: { message: 'Initiate socket connection' },
+      };
+    }
+
+    const { participantId, conversationId } = data;
+
+    const currentUserDetails = await this.userService.getRepository().findOne({
+      userId: currentUser,
     });
 
-    const updatedMessage = await this.messageService
+    if (!currentUserDetails) {
+      return {
+        event: 'warning',
+        message: 'No such user found',
+      };
+    }
+
+    // Check If conversationId exists
+    const conversation = await this.conversationService
       .getRepository()
-      .findOneAndUpdate(
+      .findById(conversationId);
+    if (!conversation)
+      return {
+        event: 'error',
+        data: { message: 'No any conversation with such id found' },
+      };
+
+    // finding mongoose userId of the user
+    const participantDetails = await this.userService.getRepository().findOne({
+      userId: participantId,
+    });
+
+    if (!participantDetails) {
+      return {
+        event: "warning",
+        message: "no such user found"
+      }
+    }
+
+    // Get participants of conversation
+    const participants = await this.conversationPService
+      .getRepository()
+      .aggregate([
         {
-          _id: messages[0]._id,
+          $match: {
+            conversation: new Types.ObjectId(conversationId),
+          },
         },
         {
-          $addToSet: { seenBy: userId },
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'userDetail',
+          },
         },
-        { new: true },
+        {
+          $match: {
+            'userDetail.userId': { $ne: participantId },
+          },
+        },
+      ]);
+
+    if (!participants || participants.length === 0) {
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' },
+      };
+    }
+
+    // if group adding the new participant
+    if (participants.length > 2) {
+      const participantPartOfConv = await this.conversationPService.findWhere({
+        conversation: new Types.ObjectId(conversationId),
+        user: participantDetails._id,
+      });
+
+      if (participantPartOfConv.length !== 0) {
+        return {
+          event: 'warning',
+          message: 'participant is already part of this conversation',
+        };
+      }
+
+      const newParticipant = await this.conversationPService.save({
+        conversation: new Types.ObjectId(conversationId),
+        user: participantDetails._id,
+      });
+
+      await this.conversationService.getRepository().updateOne(
+        { _id: conversationId },
+        {
+          $addToSet: { participants: newParticipant._id },
+        },
       );
 
-    this.chatService.emitToSocket('statusUpdate', participants, {
-      conversationId: conversationId,
-      messageId: messages[0]._id,
-      seenBy: updatedMessage!.seenBy,
-    });
+      await this.messageService.save({
+        conversation: new Types.ObjectId(conversationId),
+        sender: currentUserDetails._id,
+        content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
+        messageType: 'log',
+        messageStatus: 'delivered',
+      });
+    } else {
+
+      // creating a new conversation if personal msg
+      const newConversation = await this.conversationService.getRepository().create({
+      })
+
+      if (!newConversation) {
+        return {
+          event: 'warning',
+          message: "something went wrong while creating the conversation"
+        }
+      }
+
+      const oldParticipants = participants.map((p) => ({
+        _id: new Types.ObjectId(),
+        conversation: new Types.ObjectId(String(newConversation._id)),
+        user: p.user
+      }))
+
+      if (!oldParticipants.some(p => p.user.equals(participantDetails._id))) {
+        oldParticipants.push({
+          _id: new Types.ObjectId(),
+          conversation: new Types.ObjectId(String(newConversation._id)),
+          user: new Types.ObjectId(String(participantDetails._id)),
+        })
+      }
+
+      await this.conversationPService.getRepository().insertMany(oldParticipants)
+
+      await this.conversationService.getRepository().updateOne({
+        _id: newConversation._id
+      }, {
+        $set: { participants: oldParticipants.map(x => x._id) }
+      })
+
+      await this.messageService.save({
+        conversation: new Types.ObjectId(String(newConversation._id)),
+        sender: currentUserDetails._id,
+        content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
+        messageType: 'log',
+        messageStatus: 'delivered',
+      });
+
+    }
   }
 }

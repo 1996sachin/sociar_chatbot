@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 
 type NotFoundOptions = {
   model: mongoose.Model<any>;
-  field?: string;
+  field: string;
   message?: string;
 };
 

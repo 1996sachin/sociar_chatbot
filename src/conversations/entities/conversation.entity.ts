@@ -14,6 +14,12 @@ export class Conversation {
 
   @Prop()
   lastMessage: string;
+
+  @Prop()
+  name: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  createdBy: Types.ObjectId;
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);

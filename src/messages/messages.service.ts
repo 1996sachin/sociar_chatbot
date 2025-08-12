@@ -144,7 +144,7 @@ export class MessageService extends BaseService<MessageDocument> {
           $unset: 'userId', // Remove the lookup field
         },
         {
-          $sort: { updatedAt: -1, createdAt: -1 },
+          $sort: { createdAt: -1 },
         },
         {
           $skip: offset,
@@ -162,5 +162,46 @@ export class MessageService extends BaseService<MessageDocument> {
         messages: newData,
       },
     };
+  }
+
+  async seenMessage(conversationId: string, userId: string) {
+
+    console.log("conversationId", conversationId);
+    console.log("userId", userId);
+
+    // fetching the messages in descending order to pick the latest message
+    const messages = await this
+      .getRepository()
+      .find({ conversation: new Types.ObjectId(conversationId) })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    console.log("messages", messages);
+
+
+    // function rto remove the seen status from the previous message after seeing the latest message
+    await this.getRepository().updateMany(
+      {
+        conversation: new Types.ObjectId(conversationId),
+        _id: { $ne: messages[0]._id }
+      },
+      {
+        $pull: { seenBy: userId }
+      }
+    )
+
+    // adding the seen status on the latest message of a particular user
+    const messagesAfterSeen = await this.getRepository().findByIdAndUpdate(
+      {
+        _id: messages[0]._id
+      },
+      {
+        $addToSet: { seenBy: userId }
+      },
+      { new: true }
+    )
+
+    return messagesAfterSeen
+
   }
 }
