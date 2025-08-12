@@ -173,9 +173,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     const { conversationId, message } = data;
 
     // Check If conversationId exists
-    const conversation = await this.conversationService
-      .getRepository()
-      .findById(conversationId);
+    const conversation = await this.conversationService.find(conversationId);
     if (!conversation)
       return {
         event: 'error',
@@ -184,10 +182,10 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     // Get participants & Check If user is part of conversation
     const participants =
-      await this.conversationPService.getParticipantsExcludingSelf(
+      await this.conversationPService.getParticipantsUserDetails(
         conversationId,
-        userId,
       );
+    console.log('participants', participants);
     if (!participants)
       return {
         event: 'error',
@@ -208,27 +206,33 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     // If the user is in online "notify" that user with message
     const emittedSockets = this.chatService.emitToFilteredSocket(
+      'message',
       participants,
       userId,
       {
         message: data.message,
         createdAt: (messageInfo as any).createdAt,
         new: conversation.lastMessage ? false : true,
-        group: participants.length > 1 ? true : false,
+        group: participants.length > 2 ? true : false,
         conversationId: conversationId,
         userId: userId,
       },
     );
 
-    if (emittedSockets > 0)
-      await this.messageService.updateWhere(
-        {
-          conversation: new Types.ObjectId(conversationId),
-        },
-        {
-          messageStatus: MessageStatus.DELIVERED,
-        },
-      );
+    if (emittedSockets <= 0) return;
+
+    await this.messageService.updateWhere(
+      {
+        conversation: new Types.ObjectId(conversationId),
+      },
+      {
+        messageStatus: MessageStatus.DELIVERED,
+      },
+    );
+    this.chatService.emitToSocket('statusUpdate', participants, {
+      conversationId: conversationId,
+      messageStatus: MessageStatus.DELIVERED,
+    });
   }
 
   @SubscribeMessage('seenMessage')
@@ -246,9 +250,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     const { conversationId } = data;
 
     // Check If conversationId exists
-    const conversation = await this.conversationService
-      .getRepository()
-      .findById(conversationId);
+    const conversation = await this.conversationService.find(conversationId);
     if (!conversation)
       return {
         event: 'error',

@@ -42,6 +42,26 @@ export class ConversationParticipantService extends BaseService<ConversationPart
     return participants;
   }
 
+  async getParticipantsUserDetails(conversationId) {
+    const participants = await this.getRepository().aggregate([
+      {
+        $match: {
+          conversation: new Types.ObjectId(conversationId),
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'userDetail',
+        },
+      },
+    ]);
+
+    return participants;
+  }
+
   async getPastConversation(allParticipants) {
     const conversationParticipants = await this.getRepository().aggregate([
       {
