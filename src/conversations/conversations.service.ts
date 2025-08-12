@@ -84,7 +84,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
         },
       },
       {
-        $match: { 'participants.userId': '2' },
+        $match: { 'participants.userId': user },
       },
       {
         // Find latest "seen" timestamp for user '2'
@@ -97,7 +97,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
                   $filter: {
                     input: '$messages',
                     as: 'm',
-                    cond: { $in: ['2', '$$m.seenBy'] },
+                    cond: { $in: [user, '$$m.seenBy'] },
                   },
                 },
               },
