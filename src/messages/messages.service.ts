@@ -1,4 +1,4 @@
-import { Body, Inject, Injectable } from '@nestjs/common';
+import { Body, forwardRef, Inject, Injectable } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/common/service/base.service';
 import { MessageDocument, Message } from './entities/message.entity';
@@ -11,7 +11,7 @@ export class MessageService extends BaseService<MessageDocument> {
   constructor(
     @InjectModel(Message.name)
     private readonly MessageModel: Model<MessageDocument>,
-    @Inject()
+    @Inject(forwardRef(() => ConversationsService))
     private readonly ConversationService: ConversationsService,
     @Inject()
     private readonly ConversationParticipantService: ConversationParticipantService,

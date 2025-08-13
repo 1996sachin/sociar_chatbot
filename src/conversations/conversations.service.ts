@@ -9,6 +9,9 @@ import { BaseService } from 'src/common/service/base.service';
 import { ChatDocument, Conversation } from './entities/conversation.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { UsersService } from 'src/users/users.service';
+import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
+import { MessageService } from 'src/messages/messages.service';
+import { MessageStatus } from 'src/messages/entities/message.entity';
 
 @Injectable()
 export class ConversationsService extends BaseService<ChatDocument> {
@@ -17,6 +20,10 @@ export class ConversationsService extends BaseService<ChatDocument> {
     private readonly ConversationModel: Model<ChatDocument>,
     @Inject()
     private readonly UserService: UsersService,
+    @Inject()
+    private readonly conversationPService: ConversationParticipantService,
+    @Inject()
+    private readonly messageService: MessageService
   ) {
     super(ConversationModel);
   }
@@ -174,6 +181,80 @@ export class ConversationsService extends BaseService<ChatDocument> {
       throw new BadRequestException(
         'Conversation must have more than two participants inorder to be a group conversation',
       );
+
+    }
+  }
+
+  async leaveConversation(conversationId: string, userId: string) {
+    console.log("conversationId", conversationId);
+    console.log("userId", userId);
+
+    const mongooseUserId = await this.UserService.getRepository().findOne({ userId: userId })
+
+    console.log("mongooseUserId", mongooseUserId);
+
+
+    if (!mongooseUserId) {
+      throw new BadRequestException('No user with such userId found')
+    }
+
+    const conversation = await this.getRepository().findOne({ _id: conversationId })
+
+    if (!conversation) {
+      throw new BadRequestException('No conversation with such userId found')
+    }
+
+    const convParticipant = await this.conversationPService.findWhere(
+      {
+        conversation: conversation._id,
+        user: mongooseUserId._id
+      }
+    )
+
+    if (!convParticipant) {
+      throw new BadRequestException('There is no any conversation participants with such conversation id and user id')
+    }
+
+    console.log("convParticipant[0]._id", convParticipant[0]._id);
+
+
+    if (conversation.conversationType === 'group') {
+      await this.conversationPService.delete(convParticipant[0]._id)
+      await this.getRepository().updateOne({
+        _id: conversation._id
+      },
+        {
+          $pull: { participants: convParticipant[0]._id }
+        }
+      )
+
+
+      console.log("convParticipant[0]._id", convParticipant[0]._id);
+
+      // this is log for leaving the conversation
+      const leaveLog = await this.messageService.save({
+        conversation: conversation._id,
+        sender: mongooseUserId._id,
+        content: `{${userId}} has left the conversation`,
+        messageStatus: 'delivered',
+        messageType: 'log',
+      })
+
+      // this if for latest msg of the conversation regarding the user left
+      await this.updateWhere(
+        {
+          _id: conversation._id
+        },
+        {
+          lastMessage: leaveLog.content
+        }
+      )
+
+      return {
+        message: "Conversation left successfully."
+      }
+    } else {
+      throw new BadRequestException('User cannot leave peer to peer conversation')
     }
   }
 }

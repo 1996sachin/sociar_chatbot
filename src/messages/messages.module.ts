@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MessageService } from './messages.service';
 import { MessagesController } from './messages.controller';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -11,11 +11,11 @@ import { ConversationParticipantModule } from 'src/conversation-participant/conv
   imports: [
     MongooseModule.forFeature([{ name: 'Message', schema: MessageSchema }]),
     UsersModule,
-    ConversationsModule,
+    forwardRef(() => ConversationsModule),
     ConversationParticipantModule,
   ],
   controllers: [MessagesController],
   providers: [MessageService],
   exports: [MongooseModule, MessageService],
 })
-export class MessagesModule {}
+export class MessagesModule { }
