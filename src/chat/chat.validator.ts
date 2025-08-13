@@ -16,7 +16,10 @@ export const createConversationSchema = z
   .object({
     participants: z
       .array(z.coerce.string())
-      .nonempty('Participants cannot be empty'),
+      .nonempty('Participants cannot be empty')
+      .refine((arr) => new Set(arr).size === arr.length, {
+        message: 'Participants must not contain duplicate values',
+      }),
   })
   .required();
 export type CreateConversationDto = z.infer<typeof createConversationSchema>;

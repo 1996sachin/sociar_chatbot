@@ -155,11 +155,15 @@ export class MessageService extends BaseService<MessageDocument> {
         { $project: { conversation: 0 } },
       ])
       .exec();
+    //TODO: Later take the conversationInfo from the validator rule
+    const conversationInfo =
+      await this.ConversationService.find(conversationId);
+    const group = conversationInfo!.participants.length > 2;
     return {
       message: 'Messages fetched',
       data: {
         conversation: conversationId,
-        messages: newData,
+        messages: newData.map((data) => ({ ...data, group })),
       },
     };
   }

@@ -108,7 +108,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     const { participants } = data;
     const allParticipants = [
       ...participants.map((parti) => parti.toString()),
-      userId,
+      ...(participants.includes(userId) ? [] : [userId]),
     ];
 
     //Check if participants exists
