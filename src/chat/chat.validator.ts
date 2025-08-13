@@ -69,3 +69,14 @@ export const leaveConversationSchema = (
     })
   })
 export type leaveConversationDto = z.infer<ReturnType<typeof leaveConversationSchema>>
+
+export const removeParticipantSchema = (ConversationModel: Model<ChatDocument>) =>
+  z.object({
+    participantId: z.string(),
+    conversationId: notFoundCheck({
+      model: ConversationModel,
+      field: '_id',
+      message: 'No conversation with such conversation id found'
+    })
+  })
+export type removeParticipantDto = z.infer<ReturnType<typeof removeParticipantSchema>>

@@ -169,19 +169,12 @@ export class MessageService extends BaseService<MessageDocument> {
   }
 
   async seenMessage(conversationId: string, userId: string) {
-
-    console.log("conversationId", conversationId);
-    console.log("userId", userId);
-
     // fetching the messages in descending order to pick the latest message
     const messages = await this
       .getRepository()
       .find({ conversation: new Types.ObjectId(conversationId) })
       .sort({ createdAt: -1 })
       .lean();
-
-    console.log("messages", messages);
-
 
     // function rto remove the seen status from the previous message after seeing the latest message
     await this.getRepository().updateMany(

@@ -31,11 +31,13 @@ import type {
   seenMessageDto,
   addParticipantsDto,
   leaveConversationDto,
+  removeParticipantDto,
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
 import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
+import { RemoveParticipantValidationPipe } from 'src/common/pipes/remove-participant.pipe';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -113,14 +115,11 @@ export class ChatGateway implements OnGatewayDisconnect {
         },
       ])
     const conversatoins = conversationInfos.map(conversationInfo => conversationInfo.conversation)
-    console.log("conversatoins", conversatoins);
-
 
     await this.messageService.getRepository().updateMany(
       { conversation: { $in: conversatoins } },
       { $set: { messageStatus: MessageStatus.DELIVERED } }
     )
-
   }
 
   @SubscribeMessage('createConversation')
@@ -581,5 +580,28 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     // using the service to leave the conversation
     return this.conversationService.leaveConversation(conversationId, currentUser)
+  }
+
+  // socket event for admin to remove the conversation participants 
+  @SubscribeMessage('removeParticipant')
+  async removeParticipant(
+    @MessageBody(
+      RemoveParticipantValidationPipe
+    ) data: removeParticipantDto,
+    @ConnectedSocket() client: Socket
+  ) {
+
+    const { participantId, conversationId } = data
+
+    const currentUser = this.socketStore.getUserFromSocket(client.id)
+    if (!currentUser) {
+      return {
+        event: 'error',
+        data: { message: 'Initiate socket connection' }
+      }
+    }
+
+    await this.conversationService.removeParticipant(conversationId, currentUser, participantId)
+
   }
 }
