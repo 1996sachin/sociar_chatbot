@@ -20,9 +20,9 @@ import { Types } from 'mongoose';
 import { UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
-  // addParticipantsSchema,
   createConversationSchema,
   initializeChatSchema,
+  leaveConversationSchema,
   sendMessageSchema,
 } from './chat.validator';
 import type {
@@ -31,11 +31,14 @@ import type {
   SendMessageDto,
   seenMessageDto,
   addParticipantsDto,
+  leaveConversationDto,
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
 import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
+import { AddParticipantsValidationPipe } from 'src/common/pipes/add-participant.pipe';
+import { conversationType } from 'src/conversations/entities/conversation.entity';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -304,10 +307,7 @@ export class ChatGateway implements OnGatewayDisconnect {
   @SubscribeMessage('addParticipants')
   async addParticipants(
     @MessageBody(
-      // new ZodValidationPipe(
-      //   this.conversationService.getRepository(),
-      //   this.userService.getRepository(),
-      //   (error) => new WsException({ event: 'error', data: error })
+      // AddParticipantsValidationPipe
     )
     data: addParticipantsDto,
     @ConnectedSocket() client: Socket,
@@ -387,7 +387,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     }
 
     // if group adding the new participant
-    if (participants.length > 2) {
+    if (conversation.conversationType === 'group') {
       const participantPartOfConv = await this.conversationPService.findWhere({
         conversation: new Types.ObjectId(conversationId),
         user: participantDetails._id,
@@ -412,17 +412,28 @@ export class ChatGateway implements OnGatewayDisconnect {
         },
       );
 
-      await this.messageService.save({
+      const logMsg = await this.messageService.save({
         conversation: new Types.ObjectId(conversationId),
         sender: currentUserDetails._id,
         content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
         messageType: 'log',
         messageStatus: 'delivered',
       });
+
+      await this.conversationService.updateWhere(
+        {
+          _id: new Types.ObjectId(conversationId)
+        },
+        {
+          lastMessage: logMsg.content
+        }
+      )
     } else {
 
       // creating a new conversation if personal msg
       const newConversation = await this.conversationService.getRepository().create({
+        createdBy: currentUserDetails._id,
+        conversationType: 'group'
       })
 
       if (!newConversation) {
@@ -463,5 +474,30 @@ export class ChatGateway implements OnGatewayDisconnect {
       });
 
     }
+  }
+
+  @SubscribeMessage('leaveConversation')
+  async leaveConversation(
+    @MessageBody(
+      // new ZodValidationPipe(
+      //   leaveConversationSchema,
+      //   (error) => new WsException({ event: "error", data: error })
+      // )
+    )
+    data: leaveConversationDto,
+    @ConnectedSocket() client: Socket
+  ) {
+    const currentUser = this.socketStore.getUserFromSocket(client.id)
+    if (!currentUser) {
+      return {
+        event: "error",
+        data: { message: 'Initiate socket connection' }
+      }
+    }
+
+    const { conversationId } = data
+
+    // using the service to leave the conversation
+    return this.conversationService.leaveConversation(conversationId, currentUser)
   }
 }

@@ -11,7 +11,7 @@ interface Participant {
 
 @Injectable()
 export class ChatService {
-  constructor(private readonly socketStore: SocketStore) {}
+  constructor(private readonly socketStore: SocketStore) { }
 
   emitToFilteredSocket(
     eventName: string,
@@ -22,7 +22,7 @@ export class ChatService {
     const filteredParticipants = this.filterSelf(participants, userId);
     return this.emitToSocket(eventName, filteredParticipants, message);
   }
-
+  // remove pachi use this
   emitToSocket(
     eventName: string,
     participants: Participant[],

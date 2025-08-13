@@ -23,3 +23,14 @@ export const updateConversationValidator = (
       }),
     ),
   });
+
+export const leaveConversationValidator = (ConverastionModel: Model<ChatDocument>) =>
+  z.object({
+    conversationId: isValidObjectId().pipe(
+      notFoundCheck({
+        model: ConverastionModel,
+        field: '_id',
+        message: 'Conversation deos not exists'
+      })
+    )
+  })

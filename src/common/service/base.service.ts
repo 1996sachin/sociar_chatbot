@@ -71,7 +71,7 @@ export class BaseService<T extends Document> {
     return updatedData;
   }
 
-  async delete(id: string) {
+  async delete(id: any) {
     const deleted = await this.entity.findByIdAndDelete(id);
     return deleted;
   }
