@@ -195,6 +195,11 @@ export class ChatGateway implements OnGatewayDisconnect {
         data: { message: 'Invalid conversation' },
       };
 
+    const messages = await this.messageService.getRepository()
+      .findOne({ conversation: new Types.ObjectId(conversationId) })
+      .sort({ createdAt: -1 })
+      .lean()
+
     const user = await this.userService.findWhere({ userId });
     const messageInfo = await this.messageService.save({
       conversation: new Types.ObjectId(conversationId),
@@ -203,6 +208,13 @@ export class ChatGateway implements OnGatewayDisconnect {
       sender: new Types.ObjectId(user[0].id),
       seenBy: [userId],
     });
+
+    if (messages && !(messages.seenBy as any[]).includes(userId))
+      this.chatService.emitToFilteredSocket('statusUpdate', participants, userId, {
+        conversationId: conversationId,
+        messageId: messages?._id,
+        seenBy: [...messages?.seenBy, userId]
+      })
 
     // for removing the previous seen status in the message after pushing a new message
     await this.messageService.seenMessage(conversationId, userId)
@@ -243,6 +255,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       conversationId: conversationId,
       messageStatus: MessageStatus.DELIVERED,
     });
+
   }
 
   @SubscribeMessage('seenMessage')
