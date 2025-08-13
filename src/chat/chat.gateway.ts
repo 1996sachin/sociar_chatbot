@@ -302,6 +302,38 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     // using the seen logic from the message service
     await this.messageService.seenMessage(conversation._id as string, userId)
+
+    const messages = await this.messageService
+      .getRepository()
+      .find({ conversation: conversation._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    await this.messageService.getRepository().updateMany(
+      {
+        conversation: conversation._id,
+        _id: { $ne: messages[0]._id },
+      },
+      { $pull: { seenBy: userId } },
+    );
+
+    const updatedMessage = await this.messageService
+      .getRepository()
+      .findOneAndUpdate(
+        {
+          _id: messages[0]._id,
+        },
+        {
+          $addToSet: { seenBy: userId },
+        },
+        { new: true },
+      );
+
+    this.chatService.emitToSocket('statusUpdate', participants, {
+      conversationId: conversationId,
+      messageId: messages[0]._id,
+      seenBy: updatedMessage!.seenBy,
+    });
   }
 
   @SubscribeMessage('addParticipants')
