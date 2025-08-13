@@ -22,7 +22,6 @@ import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validatio
 import {
   createConversationSchema,
   initializeChatSchema,
-  leaveConversationSchema,
   sendMessageSchema,
 } from './chat.validator';
 import type {
@@ -37,8 +36,6 @@ import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter
 import { CustomLogger } from 'src/config/custom.logger';
 import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
-import { AddParticipantsValidationPipe } from 'src/common/pipes/add-participant.pipe';
-import { conversationType } from 'src/conversations/entities/conversation.entity';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -81,9 +78,49 @@ export class ChatGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
   ) {
     logger.debug(`[connected] socket: ${client.id}, userId: ${data.userId}`);
+
     this.socketStore.remove(client.id);
     this.socketStore.add(data.userId, client.id, client);
     await this.userService.saveIfNotExists({ userId: data.userId });
+
+    // deliver msg afte init
+    const conversationInfos = await this.conversationPService.getRepository().aggregate(
+      [
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'userDetails',
+          },
+        },
+        { $unwind: '$userDetails' },
+        {
+          $group: {
+            _id: '$conversation',
+            userDetails: { $push: '$userDetails' },
+            userIds: { $addToSet: '$userDetails.userId' },
+          },
+        },
+        { $match: { userIds: data.userId } },
+        {
+          $project: {
+            _id: 0,
+            conversation: '$_id',
+            userDetails: 1,
+            userIds: 1,
+          },
+        },
+      ])
+    const conversatoins = conversationInfos.map(conversationInfo => conversationInfo.conversation)
+    console.log("conversatoins", conversatoins);
+
+
+    await this.messageService.getRepository().updateMany(
+      { conversation: { $in: conversatoins } },
+      { $set: { messageStatus: MessageStatus.DELIVERED } }
+    )
+
   }
 
   @SubscribeMessage('createConversation')
