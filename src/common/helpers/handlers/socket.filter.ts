@@ -12,7 +12,6 @@ export class SocketExceptionFilter extends BaseWsExceptionFilter {
     // Emit the error event back to the same client
     const rawError = exception.getError() as any;
     if (rawError.data instanceof ZodError && rawError.data.issues.length) {
-      console.log(rawError.data.issues[0]);
       client.emit('error', {
         message: `${rawError.data.issues[0].path[0]}: ${rawError.data.issues[0].message}`,
       });
