@@ -255,6 +255,7 @@ export class ChatGateway implements OnGatewayDisconnect {
           conversationId: conversationId,
           group: participants.length > 2 ? true : false,
           messageId: messages?._id,
+          messageStatus: MessageStatus.SEEN,
           seenBy: [...messages?.seenBy, userId],
         },
       );
@@ -390,6 +391,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       conversationId: conversationId,
       messageId: messages[0]._id,
       group: participants.length > 2 ? true : false,
+      messageStatus: MessageStatus.SEEN,
       seenBy: updatedMessage!.seenBy,
     });
   }
