@@ -16,12 +16,14 @@ import { MessageService } from 'src/messages/messages.service';
 import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
-import { Types } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
   createConversationSchema,
   initializeChatSchema,
+  leaveConversationSchema,
+  removeParticipantSchema,
   sendMessageSchema,
 } from './chat.validator';
 import type {
@@ -31,11 +33,14 @@ import type {
   seenMessageDto,
   addParticipantsDto,
   leaveConversationDto,
+  removeParticipantDto,
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
 import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
+import { Conversation } from 'src/conversations/entities/conversation.entity';
+import { ValidationWithModelPipe } from 'src/common/helpers/validation-helper';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -610,10 +615,7 @@ export class ChatGateway implements OnGatewayDisconnect {
   @SubscribeMessage('leaveConversation')
   async leaveConversation(
     @MessageBody(
-      // new ZodValidationPipe(
-      //   leaveConversationSchema,
-      //   (error) => new WsException({ event: "error", data: error })
-      // )
+      ValidationWithModelPipe(Conversation.name, leaveConversationSchema)
     )
     data: leaveConversationDto,
     @ConnectedSocket() client: Socket
@@ -630,5 +632,42 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     // using the service to leave the conversation
     return this.conversationService.leaveConversation(conversationId, currentUser)
+  }
+
+  // socket event for admin to remove the conversation participants 
+  @SubscribeMessage('removeParticipant')
+  async removeParticipant(
+    @MessageBody(
+      ValidationWithModelPipe(Conversation.name, removeParticipantSchema)
+    ) data: removeParticipantDto,
+    @ConnectedSocket() client: Socket
+  ) {
+
+    const { participantId, conversationId } = data
+
+    const currentUser = this.socketStore.getUserFromSocket(client.id)
+    if (!currentUser) {
+      return {
+        event: 'error',
+        data: { message: 'Initiate socket connection' }
+      }
+    }
+
+    const participants =
+      await this.conversationPService.getParticipantsUserDetails(
+        conversationId,
+      );
+    if (!participants)
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' },
+      };
+
+    await this.conversationService.removeParticipant(conversationId, currentUser, participantId)
+
+    this.chatService.emitToFilteredSocket("statusUpdate", participants, currentUser, {
+      conversationId: conversationId,
+    })
+
   }
 }

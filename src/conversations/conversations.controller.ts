@@ -68,7 +68,6 @@ export class ConversationsController {
     const parsedData = updateConversationValidator(
       this.conversationsService.getRepository(),
     ).parseAsync(data);
-    console.log(parsedData);
 
     return this.conversationsService.update(conversationId, body);
   }
