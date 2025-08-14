@@ -253,7 +253,7 @@ export class ChatGateway implements OnGatewayDisconnect {
         userId,
         {
           conversationId: conversationId,
-          group: participants.length > 2 ? true : false,
+          group: conversation.participants.length > 2 ? true : false,
           messageId: messages?._id,
           messageStatus: MessageStatus.SEEN,
           seenBy: [...messages?.seenBy, userId],
@@ -276,7 +276,7 @@ export class ChatGateway implements OnGatewayDisconnect {
         message: data.message,
         createdAt: (messageInfo as any).createdAt,
         new: conversation.lastMessage ? false : true,
-        group: participants.length > 2 ? true : false,
+        group: conversation.participants.length > 2 ? true : false,
         conversationId: conversationId,
         userId: userId,
         participants: participants.map(
@@ -297,7 +297,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     );
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
-      group: participants.length > 2 ? true : false,
+      group: conversation.participants.length > 2 ? true : false,
       messageStatus: MessageStatus.DELIVERED,
     });
 
@@ -390,7 +390,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
       messageId: messages[0]._id,
-      group: participants.length > 2 ? true : false,
+      group: conversation.participants.length > 2 ? true : false,
       messageStatus: MessageStatus.SEEN,
       seenBy: updatedMessage!.seenBy,
     });

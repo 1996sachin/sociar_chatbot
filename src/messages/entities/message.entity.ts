@@ -4,7 +4,7 @@ import { Types, Document } from 'mongoose';
 export enum MessageStatus {
   SENT = 'sent',
   DELIVERED = 'delivered',
-  READ = 'read',
+  SEEN = 'seen',
 }
 
 export enum MessageTypes {

@@ -204,7 +204,7 @@ export class MessageService extends BaseService<MessageDocument> {
         _id: messages[0]._id
       },
       {
-        $addToSet: { seenBy: userId, messageStatus: MessageStatus.SEEN },
+        $addToSet: { seenBy: userId },
       },
       { new: true }
     )
