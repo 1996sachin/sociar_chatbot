@@ -262,7 +262,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
       throw new BadRequestException('Cannot remove participant from the private conversation')
     }
 
-
     const participantUserId = await this.UserService.getRepository().findOne({ userId: participantId })
     const adminUserId = await this.UserService.getRepository().findOne({ userId: userId })
 
@@ -270,7 +269,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       throw new BadRequestException('No user with such userId found')
     }
 
-    if (conversation.createdBy.equals(adminUserId?._id as string)) {
+    if (!conversation.createdBy.equals(adminUserId?._id as string)) {
       throw new BadRequestException('Only admin can remove participants')
     }
 
@@ -285,40 +284,40 @@ export class ConversationsService extends BaseService<ChatDocument> {
       throw new BadRequestException('There is no any conversation participants with such conversation id and user id')
     }
 
-    if (userId !== participantId) {
-      await this.conversationPService.delete(convParticipant[0]._id)
-      await this.getRepository().updateOne({
-        _id: conversation._id
-      },
-        {
-          $pull: { participants: convParticipant[0]._id }
-        }
-      )
-
-      // this is log for leaving the conversation
-      const leaveLog = await this.messageService.save({
-        conversation: conversation._id,
-        sender: adminUserId._id,
-        content: `{${participantId}} has been removed from the conversation`,
-        messageStatus: 'delivered',
-        messageType: 'log',
-      })
-
-      // this if for latest msg of the conversation regarding the user removed 
-      await this.updateWhere(
-        {
-          _id: conversation._id
-        },
-        {
-          lastMessage: leaveLog.content
-        }
-      )
-
-      return {
-        message: "Participant removed successfully."
-      }
+    if (userId === participantId) {
+      throw new BadRequestException('Admin cannot remove themselve from the conversation')
     }
 
-  }
+    await this.conversationPService.delete(convParticipant[0]._id)
+    await this.getRepository().updateOne({
+      _id: conversation._id
+    },
+      {
+        $pull: { participants: convParticipant[0]._id }
+      }
+    )
 
+    // this is log for leaving the conversation
+    const leaveLog = await this.messageService.save({
+      conversation: conversation._id,
+      sender: adminUserId._id,
+      content: `{${participantId}} has been removed from the conversation`,
+      messageStatus: 'delivered',
+      messageType: 'log',
+    })
+
+    // this if for latest msg of the conversation regarding the user removed 
+    await this.updateWhere(
+      {
+        _id: conversation._id
+      },
+      {
+        lastMessage: leaveLog.content
+      }
+    )
+
+    return {
+      message: "Participant removed successfully."
+    }
+  }
 }
