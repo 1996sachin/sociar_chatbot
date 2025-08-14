@@ -58,7 +58,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) { }
+  ) {}
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -83,9 +83,10 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.socketStore.add(data.userId, client.id, client);
     await this.userService.saveIfNotExists({ userId: data.userId });
 
-    // deliver msg afte init
-    const conversationInfos = await this.conversationPService.getRepository().aggregate(
-      [
+    // deliver msg after init
+    const conversationInfos = await this.conversationPService
+      .getRepository()
+      .aggregate([
         {
           $lookup: {
             from: 'users',
@@ -111,16 +112,49 @@ export class ChatGateway implements OnGatewayDisconnect {
             userIds: 1,
           },
         },
-      ])
-    const conversatoins = conversationInfos.map(conversationInfo => conversationInfo.conversation)
-    console.log("conversatoins", conversatoins);
+      ]);
+    const conversations = conversationInfos.map(
+      (conversationInfo) => conversationInfo.conversation,
+    );
 
+    const latestMessages = await this.messageService.getRepository().aggregate([
+      {
+        $match: {
+          conversation: {
+            $in: conversations,
+          },
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+      {
+        $group: {
+          _id: '$conversation',
+          latestMessage: { $first: '$$ROOT' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          foreignField: '_id',
+          localField: 'latestMessage.sender',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+    ]);
 
-    await this.messageService.getRepository().updateMany(
-      { conversation: { $in: conversatoins } },
-      { $set: { messageStatus: MessageStatus.DELIVERED } }
-    )
+    const notOurMessages = latestMessages
+      .filter((messages) => messages.user.userId !== data.userId)
+      .map((message) => message._id);
 
+    await this.messageService
+      .getRepository()
+      .updateMany(
+        { conversation: { $in: notOurMessages } },
+        { $set: { messageStatus: MessageStatus.DELIVERED } },
+      );
   }
 
   @SubscribeMessage('createConversation')
@@ -147,6 +181,11 @@ export class ChatGateway implements OnGatewayDisconnect {
       ...participants.map((parti) => parti.toString()),
       ...(participants.includes(userId) ? [] : [userId]),
     ];
+    if (allParticipants.length < 2)
+      return {
+        event: 'error',
+        data: { message: 'Invalid participants' },
+      };
 
     //Check if participants exists
     const userInfo = await this.userService.findWhere({
