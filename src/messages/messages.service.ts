@@ -114,15 +114,15 @@ export class MessageService extends BaseService<MessageDocument> {
       limit,
     };
 
-    await this.getRepository().updateMany(
-      {
-        conversation: new Types.ObjectId(conversationId),
-        messageStatus: { $ne: 'delivered' },
-      },
-      {
-        $set: { messageStatus: 'delivered' },
-      },
-    );
+    // await this.getRepository().updateMany(
+    //   {
+    //     conversation: new Types.ObjectId(conversationId),
+    //     messageStatus: { $ne: 'delivered' },
+    //   },
+    //   {
+    //     $set: { messageStatus: 'delivered' },
+    //   },
+    // );
 
     const newData = await this.getRepository()
       .aggregate([
