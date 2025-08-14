@@ -16,12 +16,14 @@ import { MessageService } from 'src/messages/messages.service';
 import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
-import { Types } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
   createConversationSchema,
   initializeChatSchema,
+  leaveConversationSchema,
+  removeParticipantSchema,
   sendMessageSchema,
 } from './chat.validator';
 import type {
@@ -37,7 +39,8 @@ import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter
 import { CustomLogger } from 'src/config/custom.logger';
 import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
-import { RemoveParticipantValidationPipe } from 'src/common/pipes/remove-participant.pipe';
+import { Conversation } from 'src/conversations/entities/conversation.entity';
+import { createValidationPipeWithModel } from 'src/common/helpers/validation-helper';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -249,7 +252,6 @@ export class ChatGateway implements OnGatewayDisconnect {
       this.chatService.emitToFilteredSocket('statusUpdate', participants, userId, {
         conversationId: conversationId,
         messageId: messages?._id,
-        group: participants.length > 2 ? true : false,
         seenBy: [...messages?.seenBy, userId]
       })
 
@@ -269,7 +271,6 @@ export class ChatGateway implements OnGatewayDisconnect {
         message: data.message,
         createdAt: (messageInfo as any).createdAt,
         new: conversation.lastMessage ? false : true,
-        group: participants.length > 2 ? true : false,
         conversationId: conversationId,
         userId: userId,
         participants: participants.map(
@@ -290,7 +291,6 @@ export class ChatGateway implements OnGatewayDisconnect {
     );
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
-      group: participants.length > 2 ? true : false,
       messageStatus: MessageStatus.DELIVERED,
     });
 
@@ -383,7 +383,6 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
       messageId: messages[0]._id,
-      group: participants.length > 2 ? true : false,
       seenBy: updatedMessage!.seenBy,
     });
   }
@@ -563,10 +562,7 @@ export class ChatGateway implements OnGatewayDisconnect {
   @SubscribeMessage('leaveConversation')
   async leaveConversation(
     @MessageBody(
-      // new ZodValidationPipe(
-      //   leaveConversationSchema,
-      //   (error) => new WsException({ event: "error", data: error })
-      // )
+      createValidationPipeWithModel(Conversation.name, leaveConversationSchema)
     )
     data: leaveConversationDto,
     @ConnectedSocket() client: Socket
@@ -589,7 +585,7 @@ export class ChatGateway implements OnGatewayDisconnect {
   @SubscribeMessage('removeParticipant')
   async removeParticipant(
     @MessageBody(
-      RemoveParticipantValidationPipe
+      createValidationPipeWithModel(Conversation.name, removeParticipantSchema)
     ) data: removeParticipantDto,
     @ConnectedSocket() client: Socket
   ) {
@@ -618,7 +614,6 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     this.chatService.emitToFilteredSocket("statusUpdate", participants, currentUser, {
       conversationId: conversationId,
-      group: participants.length > 2 ? true : false,
     })
 
   }
