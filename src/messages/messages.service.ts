@@ -145,7 +145,7 @@ export class MessageService extends BaseService<MessageDocument> {
           },
         },
         {
-          $unset: 'userId', // Remove the lookup field
+          $unset: 'userId',
         },
         {
           $sort: { createdAt: -1 },
@@ -174,35 +174,90 @@ export class MessageService extends BaseService<MessageDocument> {
 
   async seenMessage(conversationId: string, userId: string) {
     // fetching the messages in descending order to pick the latest message
-    const messages = await this
-      .getRepository()
+    const messages = await this.getRepository()
       .find({ conversation: new Types.ObjectId(conversationId) })
       .sort({ createdAt: -1 })
+      .limit(1)
       .lean();
 
     // function rto remove the seen status from the previous message after seeing the latest message
     await this.getRepository().updateMany(
       {
-        conversation: new Types.ObjectId(conversationId),
-        _id: { $ne: messages[0]._id }
+        conversation: messages[0].conversation,
+        _id: { $ne: messages[0]._id },
       },
-      {
-        $pull: { seenBy: userId }
-      }
-    )
+      { $pull: { seenBy: userId } },
+    );
 
     // adding the seen status on the latest message of a particular user
     const messagesAfterSeen = await this.getRepository().findByIdAndUpdate(
       {
-        _id: messages[0]._id
+        _id: messages[0]._id,
       },
       {
         $addToSet: { seenBy: userId },
       },
-      { new: true }
-    )
+      { new: true },
+    );
 
-    return messagesAfterSeen
+    return messagesAfterSeen;
+  }
 
+  async changeMessageStatus(conversationId: string, userId: string) {
+    // fetching the messages in descending order to pick the latest message
+    // const messages = await this.getRepository()
+    //   .find({ conversation: new Types.ObjectId(conversationId) })
+    //   .sort({ createdAt: -1 })
+    //   .limit(1)
+    //   .lean();
+
+    const messages = await this.getRepository().aggregate([
+      {
+        $match: {
+          conversation: new Types.ObjectId(conversationId),
+          messageStatus: {
+            $in: ['delivered', 'sent'],
+          },
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          foreignField: '_id',
+          localField: 'sender',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $match: {
+          'user.userId': { $ne: userId },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+        },
+      },
+    ]);
+    if (!messages.length) return;
+
+    const messageIds = messages.map((doc) => doc._id);
+
+    // adding the seen status on the latest message of a particular user
+    await this.getRepository().updateMany(
+      { _id: { $in: messageIds } },
+      {
+        $set: { messageStatus: MessageStatus.SEEN },
+      },
+    );
+
+    const updatedMessages = await this.getRepository().find({
+      _id: { $in: messageIds },
+    });
+    return updatedMessages;
   }
 }

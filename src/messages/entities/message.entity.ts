@@ -30,7 +30,7 @@ export class Message {
   messageStatus: MessageStatus;
 
   @Prop({})
-  seenBy: [];
+  seenBy: string[];
 
   @Prop({ default: MessageTypes.TEXT })
   messageType: MessageTypes;
