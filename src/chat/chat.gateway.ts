@@ -63,7 +63,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) { }
+  ) {}
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -88,9 +88,10 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.socketStore.add(data.userId, client.id, client);
     await this.userService.saveIfNotExists({ userId: data.userId });
 
-    // deliver msg afte init
-    const conversationInfos = await this.conversationPService.getRepository().aggregate(
-      [
+    // deliver msg after init
+    const conversationInfos = await this.conversationPService
+      .getRepository()
+      .aggregate([
         {
           $lookup: {
             from: 'users',
@@ -116,13 +117,49 @@ export class ChatGateway implements OnGatewayDisconnect {
             userIds: 1,
           },
         },
-      ])
-    const conversatoins = conversationInfos.map(conversationInfo => conversationInfo.conversation)
+      ]);
+    const conversations = conversationInfos.map(
+      (conversationInfo) => conversationInfo.conversation,
+    );
 
-    await this.messageService.getRepository().updateMany(
-      { conversation: { $in: conversatoins } },
-      { $set: { messageStatus: MessageStatus.DELIVERED } }
-    )
+    const latestMessages = await this.messageService.getRepository().aggregate([
+      {
+        $match: {
+          conversation: {
+            $in: conversations,
+          },
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+      {
+        $group: {
+          _id: '$conversation',
+          latestMessage: { $first: '$$ROOT' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          foreignField: '_id',
+          localField: 'latestMessage.sender',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+    ]);
+
+    const notOurMessages = latestMessages
+      .filter((messages) => messages.user.userId !== data.userId)
+      .map((message) => message._id);
+
+    await this.messageService
+      .getRepository()
+      .updateMany(
+        { conversation: { $in: notOurMessages } },
+        { $set: { messageStatus: MessageStatus.DELIVERED } },
+      );
   }
 
   @SubscribeMessage('createConversation')
@@ -149,6 +186,11 @@ export class ChatGateway implements OnGatewayDisconnect {
       ...participants.map((parti) => parti.toString()),
       ...(participants.includes(userId) ? [] : [userId]),
     ];
+    if (allParticipants.length < 2)
+      return {
+        event: 'error',
+        data: { message: 'Invalid participants' },
+      };
 
     //Check if participants exists
     const userInfo = await this.userService.findWhere({
@@ -249,11 +291,18 @@ export class ChatGateway implements OnGatewayDisconnect {
     });
 
     if (messages && !(messages.seenBy as any[]).includes(userId))
-      this.chatService.emitToFilteredSocket('statusUpdate', participants, userId, {
-        conversationId: conversationId,
-        messageId: messages?._id,
-        seenBy: [...messages?.seenBy, userId]
-      })
+      this.chatService.emitToFilteredSocket(
+        'statusUpdate',
+        participants,
+        userId,
+        {
+          conversationId: conversationId,
+          group: conversation.participants.length > 2 ? true : false,
+          messageId: messages?._id,
+          messageStatus: MessageStatus.SEEN,
+          seenBy: [...messages?.seenBy, userId],
+        },
+      );
 
     // for removing the previous seen status in the message after pushing a new message
     await this.messageService.seenMessage(conversationId, userId)
@@ -271,6 +320,7 @@ export class ChatGateway implements OnGatewayDisconnect {
         message: data.message,
         createdAt: (messageInfo as any).createdAt,
         new: conversation.lastMessage ? false : true,
+        group: conversation.participants.length > 2 ? true : false,
         conversationId: conversationId,
         userId: userId,
         participants: participants.map(
@@ -291,6 +341,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     );
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
+      group: conversation.participants.length > 2 ? true : false,
       messageStatus: MessageStatus.DELIVERED,
     });
 
@@ -383,6 +434,8 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
       messageId: messages[0]._id,
+      group: conversation.participants.length > 2 ? true : false,
+      messageStatus: MessageStatus.SEEN,
       seenBy: updatedMessage!.seenBy,
     });
   }

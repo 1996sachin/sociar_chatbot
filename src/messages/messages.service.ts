@@ -1,7 +1,11 @@
 import { Body, forwardRef, Inject, Injectable } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { BaseService } from 'src/common/service/base.service';
-import { MessageDocument, Message } from './entities/message.entity';
+import {
+  MessageDocument,
+  Message,
+  MessageStatus,
+} from './entities/message.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
@@ -193,7 +197,7 @@ export class MessageService extends BaseService<MessageDocument> {
         _id: messages[0]._id
       },
       {
-        $addToSet: { seenBy: userId }
+        $addToSet: { seenBy: userId },
       },
       { new: true }
     )

@@ -118,7 +118,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
             $filter: {
               input: '$participants',
               as: 'p',
-              cond: { $ne: ['$$p.userId', '2'] },
+              cond: { $ne: ['$$p.userId', user] },
             },
           },
           unreadCount: {
@@ -128,7 +128,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
                 as: 'msg',
                 cond: {
                   $and: [
-                    { $not: { $in: ['2', '$$msg.seenBy'] } },
+                    { $not: { $in: [user, '$$msg.seenBy'] } },
                     {
                       $gt: ['$$msg.createdAt', '$lastSeenDate'],
                     },
@@ -152,7 +152,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
         ...basePipeline,
         {
           $project: {
-            userId: '$otherParticipants.userId',
+            userId: '$participants.userId',
             lastMessage: -1,
             updatedAt: -1,
             unreadCount: 1,
