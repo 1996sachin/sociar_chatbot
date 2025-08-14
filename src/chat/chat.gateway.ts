@@ -249,6 +249,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       this.chatService.emitToFilteredSocket('statusUpdate', participants, userId, {
         conversationId: conversationId,
         messageId: messages?._id,
+        group: participants.length > 2 ? true : false,
         seenBy: [...messages?.seenBy, userId]
       })
 
@@ -289,6 +290,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     );
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
+      group: participants.length > 2 ? true : false,
       messageStatus: MessageStatus.DELIVERED,
     });
 
@@ -381,6 +383,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
       messageId: messages[0]._id,
+      group: participants.length > 2 ? true : false,
       seenBy: updatedMessage!.seenBy,
     });
   }
@@ -601,7 +604,22 @@ export class ChatGateway implements OnGatewayDisconnect {
       }
     }
 
+    const participants =
+      await this.conversationPService.getParticipantsUserDetails(
+        conversationId,
+      );
+    if (!participants)
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' },
+      };
+
     await this.conversationService.removeParticipant(conversationId, currentUser, participantId)
+
+    this.chatService.emitToFilteredSocket("statusUpdate", participants, currentUser, {
+      conversationId: conversationId,
+      group: participants.length > 2 ? true : false,
+    })
 
   }
 }

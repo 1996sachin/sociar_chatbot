@@ -4,8 +4,8 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { CustomLogger } from './custom.logger';
 import { catchError, Observable, tap } from 'rxjs';
+import { CustomLogger } from 'src/config/custom.logger';
 
 @Injectable()
 export class GlobalLoggingInterceptor implements NestInterceptor {

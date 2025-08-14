@@ -295,7 +295,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
         messageType: 'log',
       })
 
-      // this if for latest msg of the conversation regarding the user left
+      // this if for latest msg of the conversation regarding the user removed 
       await this.updateWhere(
         {
           _id: conversation._id
