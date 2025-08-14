@@ -252,6 +252,17 @@ export class ConversationsService extends BaseService<ChatDocument> {
 
   async removeParticipant(conversationId: string, userId: string, participantId: string) {
 
+    const conversation = await this.getRepository().findOne({ _id: conversationId })
+
+    if (!conversation) {
+      throw new BadRequestException('No conversation with such userId found')
+    }
+
+    if (conversation.conversationType !== "group") {
+      throw new BadRequestException('Cannot remove participant from the private conversation')
+    }
+
+
     const participantUserId = await this.UserService.getRepository().findOne({ userId: participantId })
     const adminUserId = await this.UserService.getRepository().findOne({ userId: userId })
 
@@ -259,10 +270,8 @@ export class ConversationsService extends BaseService<ChatDocument> {
       throw new BadRequestException('No user with such userId found')
     }
 
-    const conversation = await this.getRepository().findOne({ _id: conversationId })
-
-    if (!conversation) {
-      throw new BadRequestException('No conversation with such userId found')
+    if (conversation.createdBy.equals(adminUserId?._id as string)) {
+      throw new BadRequestException('Only admin can remove participants')
     }
 
     const convParticipant = await this.conversationPService.findWhere(
@@ -276,7 +285,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       throw new BadRequestException('There is no any conversation participants with such conversation id and user id')
     }
 
-    if (conversation.conversationType === 'group' && conversation.createdBy.equals(adminUserId._id as string) && userId !== participantId) {
+    if (userId !== participantId) {
       await this.conversationPService.delete(convParticipant[0]._id)
       await this.getRepository().updateOne({
         _id: conversation._id
@@ -308,10 +317,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       return {
         message: "Participant removed successfully."
       }
-    } else {
-      throw new BadRequestException('Participant can only be removed by the admin')
     }
-
 
   }
 
