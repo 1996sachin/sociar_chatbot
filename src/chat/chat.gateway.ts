@@ -247,11 +247,17 @@ export class ChatGateway implements OnGatewayDisconnect {
     });
 
     if (messages && !(messages.seenBy as any[]).includes(userId))
-      this.chatService.emitToFilteredSocket('statusUpdate', participants, userId, {
-        conversationId: conversationId,
-        messageId: messages?._id,
-        seenBy: [...messages?.seenBy, userId]
-      })
+      this.chatService.emitToFilteredSocket(
+        'statusUpdate',
+        participants,
+        userId,
+        {
+          conversationId: conversationId,
+          group: participants.length > 2 ? true : false,
+          messageId: messages?._id,
+          seenBy: [...messages?.seenBy, userId],
+        },
+      );
 
     // for removing the previous seen status in the message after pushing a new message
     await this.messageService.seenMessage(conversationId, userId)
@@ -290,6 +296,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     );
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
+      group: participants.length > 2 ? true : false,
       messageStatus: MessageStatus.DELIVERED,
     });
 
@@ -382,6 +389,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.chatService.emitToSocket('statusUpdate', participants, {
       conversationId: conversationId,
       messageId: messages[0]._id,
+      group: participants.length > 2 ? true : false,
       seenBy: updatedMessage!.seenBy,
     });
   }
