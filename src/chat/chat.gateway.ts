@@ -40,7 +40,7 @@ import { CustomLogger } from 'src/config/custom.logger';
 import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
 import { Conversation } from 'src/conversations/entities/conversation.entity';
-import { createValidationPipeWithModel } from 'src/common/helpers/validation-helper';
+import { ValidationWithModelPipe } from 'src/common/helpers/validation-helper';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -562,7 +562,7 @@ export class ChatGateway implements OnGatewayDisconnect {
   @SubscribeMessage('leaveConversation')
   async leaveConversation(
     @MessageBody(
-      createValidationPipeWithModel(Conversation.name, leaveConversationSchema)
+      ValidationWithModelPipe(Conversation.name, leaveConversationSchema)
     )
     data: leaveConversationDto,
     @ConnectedSocket() client: Socket
@@ -585,7 +585,7 @@ export class ChatGateway implements OnGatewayDisconnect {
   @SubscribeMessage('removeParticipant')
   async removeParticipant(
     @MessageBody(
-      createValidationPipeWithModel(Conversation.name, removeParticipantSchema)
+      ValidationWithModelPipe(Conversation.name, removeParticipantSchema)
     ) data: removeParticipantDto,
     @ConnectedSocket() client: Socket
   ) {
