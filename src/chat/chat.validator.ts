@@ -80,3 +80,17 @@ export const removeParticipantSchema = (ConversationModel: Model<ChatDocument>) 
     })
   })
 export type removeParticipantDto = z.infer<ReturnType<typeof removeParticipantSchema>>
+
+export const renameConversationSchema = (ConversationModel: Model<ChatDocument>) =>
+  z.object({
+    name: z
+      .string()
+      .min(1, "Conversation name cannot be left empty"),
+    conversationId: notFoundCheck({
+      model: ConversationModel,
+      field: '_id',
+      message: 'No conversation with such id found'
+    })
+  })
+
+export type renameConversationDto = z.infer<ReturnType<typeof renameConversationSchema>>

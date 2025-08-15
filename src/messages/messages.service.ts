@@ -108,22 +108,6 @@ export class MessageService extends BaseService<MessageDocument> {
     const limitNum = limit ? parseInt(limit, 10) : 10;
     const offset = (pageNum - 1) * limitNum;
 
-    const requestBody = {
-      conversationId,
-      page,
-      limit,
-    };
-
-    // await this.getRepository().updateMany(
-    //   {
-    //     conversation: new Types.ObjectId(conversationId),
-    //     messageStatus: { $ne: 'delivered' },
-    //   },
-    //   {
-    //     $set: { messageStatus: 'delivered' },
-    //   },
-    // );
-
     const newData = await this.getRepository()
       .aggregate([
         {
@@ -204,12 +188,6 @@ export class MessageService extends BaseService<MessageDocument> {
   }
 
   async changeMessageStatus(conversationId: string, userId: string) {
-    // fetching the messages in descending order to pick the latest message
-    // const messages = await this.getRepository()
-    //   .find({ conversation: new Types.ObjectId(conversationId) })
-    //   .sort({ createdAt: -1 })
-    //   .limit(1)
-    //   .lean();
 
     const messages = await this.getRepository().aggregate([
       {

@@ -11,7 +11,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { UsersService } from 'src/users/users.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { MessageService } from 'src/messages/messages.service';
-import { MessageStatus } from 'src/messages/entities/message.entity';
+import { MessageStatus, MessageTypes } from 'src/messages/entities/message.entity';
 
 @Injectable()
 export class ConversationsService extends BaseService<ChatDocument> {
@@ -174,14 +174,54 @@ export class ConversationsService extends BaseService<ChatDocument> {
     };
   }
 
-  async updateConversaton(conversationId: string, data: { name: string }) {
-    const isConversationGroup = await this.find(conversationId);
+  // this is for renaming the group conversation
+  async renameConversation(conversationId: string, userId: string, name: string) {
 
-    if (isConversationGroup!.participants.length <= 2) {
+    const conversation = await this.find(conversationId);
+
+    if (!conversation) {
+      throw new BadRequestException('No conversation with such converasiton id found')
+    }
+
+    if (conversation.participants.length <= 2) {
       throw new BadRequestException(
         'Conversation must have more than two participants inorder to be a group conversation',
       );
     }
+
+    const userDetails = await this.UserService.findWhere({
+      userId: userId
+    })
+
+    if (!userDetails) {
+      throw new BadRequestException('No such user is part of this conversation')
+    }
+
+
+    const renameLog = await this.messageService.save({
+      conversation: conversation._id,
+      sender: userDetails[0]._id,
+      content: `{${userId}} renamed conversation to {${name}}`,
+      messageStatus: MessageStatus.DELIVERED,
+      MessageTypes: MessageTypes.LOG
+    })
+
+    const updated = await this.getRepository().findByIdAndUpdate({
+      _id: conversation._id,
+    },
+      {
+        $set: {
+          name: name,
+          lastMessage: renameLog.content
+        }
+      },
+      { new: true }
+    )
+
+    return {
+      message: 'Converastion renamed successfully',
+    }
+
   }
 
   async leaveConversation(conversationId: string, userId: string) {

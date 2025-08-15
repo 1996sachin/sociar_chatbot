@@ -16,7 +16,7 @@ import { MessageService } from 'src/messages/messages.service';
 import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
-import { Model, Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
@@ -24,6 +24,7 @@ import {
   initializeChatSchema,
   leaveConversationSchema,
   removeParticipantSchema,
+  renameConversationSchema,
   sendMessageSchema,
 } from './chat.validator';
 import type {
@@ -34,6 +35,7 @@ import type {
   addParticipantsDto,
   leaveConversationDto,
   removeParticipantDto,
+  renameConversationDto,
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
@@ -63,7 +65,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) {}
+  ) { }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -661,6 +663,39 @@ export class ChatGateway implements OnGatewayDisconnect {
     this.chatService.emitToFilteredSocket("statusUpdate", participants, currentUser, {
       conversationId: conversationId,
     })
+
+  }
+
+  @SubscribeMessage('renameConversation')
+  async renameConversation(
+    @MessageBody(
+      ValidationWithModelPipe(Conversation.name, renameConversationSchema)
+    ) data: renameConversationDto,
+    @ConnectedSocket() client: Socket
+  ) {
+
+    const { name, conversationId } = data
+
+    const currentUser = this.socketStore.getUserFromSocket(client.id)
+    if (!currentUser) {
+      return {
+        event: 'error',
+        data: { message: 'Initiate socket connection' }
+      }
+    }
+
+    const participants = await this.conversationPService.getParticipantsUserDetails(
+      conversationId
+    )
+
+    if (!participants) {
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' }
+      }
+    }
+
+    return await this.conversationService.renameConversation(conversationId, currentUser, name)
 
   }
 }
