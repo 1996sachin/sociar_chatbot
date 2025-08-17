@@ -291,9 +291,6 @@ export class MessageService extends BaseService<MessageDocument> {
       }
     ])
 
-    console.log("lastMessage", lastMessage);
-
-
     return lastMessage
 
   }
