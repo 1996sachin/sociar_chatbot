@@ -35,6 +35,12 @@ export const fetchMessageValidator = (ConversationModel: Model<ChatDocument>) =>
         message: 'Conversation does not exists',
       }),
     ),
-    page: z.string().optional(),
-    limit: z.string().optional(),
-  });
+    page: z
+      .number()
+      .nonnegative({ message: "Page number cannot be negative" })
+      .default(1),
+    limit: z
+      .number()
+      .positive({ message: "Limit must be greater than 0" })
+      .default(10),
+  })
