@@ -16,7 +16,7 @@ import { MessageService } from 'src/messages/messages.service';
 import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { UsersService } from 'src/users/users.service';
-import { Model, Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { UseFilters } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
@@ -24,6 +24,7 @@ import {
   initializeChatSchema,
   leaveConversationSchema,
   removeParticipantSchema,
+  renameConversationSchema,
   sendMessageSchema,
 } from './chat.validator';
 import type {
@@ -34,11 +35,12 @@ import type {
   addParticipantsDto,
   leaveConversationDto,
   removeParticipantDto,
+  renameConversationDto,
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
 import { ChatService } from './chat.service';
-import { MessageStatus } from 'src/messages/entities/message.entity';
+import { MessageStatus, MessageTypes } from 'src/messages/entities/message.entity';
 import { Conversation } from 'src/conversations/entities/conversation.entity';
 import { ValidationWithModelPipe } from 'src/common/helpers/validation-helper';
 
@@ -63,7 +65,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     private readonly conversationService: ConversationsService,
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
-  ) {}
+  ) { }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
@@ -373,31 +375,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       };
 
     // Get participants of conversation
-    const participants = await this.conversationPService
-      .getRepository()
-      .aggregate([
-        {
-          $match: {
-            conversation: new Types.ObjectId(conversationId),
-          },
-        },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'user',
-            foreignField: '_id',
-            as: 'userDetail',
-          },
-        },
-        {
-          $match: {
-            'userDetail.userId': { $ne: userId },
-          },
-        },
-        {
-          $sort: { createdAt: -1 },
-        },
-      ]);
+    const participants = await this.conversationPService.getParticipantsExcludingSelf(conversationId, userId)
 
     if (!participants)
       return {
@@ -480,28 +458,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     }
 
     // Get participants of conversation
-    const participants = await this.conversationPService
-      .getRepository()
-      .aggregate([
-        {
-          $match: {
-            conversation: new Types.ObjectId(conversationId),
-          },
-        },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'user',
-            foreignField: '_id',
-            as: 'userDetail',
-          },
-        },
-        {
-          $match: {
-            'userDetail.userId': { $ne: participantId },
-          },
-        },
-      ]);
+    const participants = await this.conversationPService.getParticipantsExcludingSelf(conversationId, participantId)
 
     if (!participants || participants.length === 0) {
       return {
@@ -540,8 +497,8 @@ export class ChatGateway implements OnGatewayDisconnect {
         conversation: new Types.ObjectId(conversationId),
         sender: currentUserDetails._id,
         content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
-        messageType: 'log',
-        messageStatus: 'delivered',
+        messageType: MessageTypes.LOG,
+        messageStatus: MessageStatus.DELIVERED,
       });
 
       await this.conversationService.updateWhere(
@@ -599,8 +556,8 @@ export class ChatGateway implements OnGatewayDisconnect {
         conversation: new Types.ObjectId(String(newConversation._id)),
         sender: currentUserDetails._id,
         content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
-        messageType: 'log',
-        messageStatus: 'delivered',
+        messageType: MessageTypes.LOG,
+        messageStatus: MessageStatus.DELIVERED,
       });
     }
   }
@@ -623,8 +580,31 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     const { conversationId } = data
 
+    const participants = await this.conversationPService.getParticipantsUserDetails(
+      conversationId
+    )
+
+    if (!participants) {
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' }
+      }
+    }
+
     // using the service to leave the conversation
-    return this.conversationService.leaveConversation(conversationId, currentUser)
+    await this.conversationService.leaveConversation(conversationId, currentUser)
+
+    const lastMessage = await this.messageService.getLastMessage(conversationId)
+
+    this.chatService.emitToFilteredSocket("logMessage", participants, currentUser as string, {
+      conversationId: conversationId,
+      group: participants.length > 2 ? true : false,
+      messageId: lastMessage[0]._id,
+      message: lastMessage[0].content,
+      messageStatus: MessageStatus.SEEN,
+      userId: currentUser,
+      messageType: lastMessage[0].messageType
+    })
   }
 
   // socket event for admin to remove the conversation participants 
@@ -658,8 +638,60 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     await this.conversationService.removeParticipant(conversationId, currentUser, participantId)
 
-    this.chatService.emitToFilteredSocket("statusUpdate", participants, currentUser, {
+    const lastMessage = await this.messageService.getLastMessage(conversationId)
+
+    this.chatService.emitToFilteredSocket("logMessage", participants, currentUser as string, {
       conversationId: conversationId,
+      group: participants.length > 2 ? true : false,
+      messageId: lastMessage[0]._id,
+      message: lastMessage[0].content,
+      messageStatus: MessageStatus.SEEN,
+      userId: currentUser,
+      messageType: lastMessage[0].messageType
+    })
+  }
+
+  @SubscribeMessage('renameConversation')
+  async renameConversation(
+    @MessageBody(
+      ValidationWithModelPipe(Conversation.name, renameConversationSchema)
+    ) data: renameConversationDto,
+    @ConnectedSocket() client: Socket
+  ) {
+
+    const { name, conversationId } = data
+
+    const currentUser = this.socketStore.getUserFromSocket(client.id)
+    if (!currentUser) {
+      return {
+        event: 'error',
+        data: { message: 'Initiate socket connection' }
+      }
+    }
+
+    const participants = await this.conversationPService.getParticipantsUserDetails(
+      conversationId
+    )
+
+    if (!participants) {
+      return {
+        event: 'error',
+        data: { message: 'Invalid conversation' }
+      }
+    }
+
+    await this.conversationService.renameConversation(conversationId, currentUser, name)
+
+    const lastMessage = await this.messageService.getLastMessage(conversationId)
+
+    this.chatService.emitToFilteredSocket("logMessage", participants, currentUser as string, {
+      conversationId: conversationId,
+      group: participants.length > 2 ? true : false,
+      messageId: lastMessage[0]._id,
+      message: lastMessage[0].content,
+      messageStatus: MessageStatus.SEEN,
+      userId: currentUser,
+      messageType: lastMessage[0].messageType
     })
 
   }
