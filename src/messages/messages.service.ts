@@ -273,4 +273,28 @@ export class MessageService extends BaseService<MessageDocument> {
     });
     return updatedMessages;
   }
+
+  async getLastMessage(conversationId: string) {
+    const lastMessage = await this.getRepository().aggregate([
+      {
+        $match: {
+          conversation: new Types.ObjectId(conversationId)
+        }
+      },
+      {
+        $sort: {
+          createdAt: -1
+        }
+      },
+      {
+        $limit: 1
+      }
+    ])
+
+    console.log("lastMessage", lastMessage);
+
+
+    return lastMessage
+
+  }
 }

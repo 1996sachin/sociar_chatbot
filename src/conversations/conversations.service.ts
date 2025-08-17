@@ -1,8 +1,7 @@
 import {
   BadRequestException,
   Inject,
-  Injectable,
-  NotFoundException,
+  Injectable, NotFoundException,
 } from '@nestjs/common';
 import { Model } from 'mongoose';
 import { BaseService } from 'src/common/service/base.service';
@@ -203,10 +202,11 @@ export class ConversationsService extends BaseService<ChatDocument> {
       sender: userDetails[0]._id,
       content: `{${userId}} renamed conversation to {${name}}`,
       messageStatus: MessageStatus.DELIVERED,
-      MessageTypes: MessageTypes.LOG
+      seenBy: [userId],
+      messageType: MessageTypes.LOG
     })
 
-    const updated = await this.getRepository().findByIdAndUpdate({
+    await this.getRepository().findByIdAndUpdate({
       _id: conversation._id,
     },
       {
@@ -272,8 +272,10 @@ export class ConversationsService extends BaseService<ChatDocument> {
         conversation: conversation._id,
         sender: mongooseUserId._id,
         content: `{${userId}} has left the conversation`,
-        messageStatus: 'delivered',
-        messageType: 'log',
+        messageStatus: MessageStatus.DELIVERED,
+        messageType: MessageTypes.LOG,
+        seenBy: [userId]
+        ,
       });
 
       // this if for latest msg of the conversation regarding the user left
@@ -346,8 +348,9 @@ export class ConversationsService extends BaseService<ChatDocument> {
       conversation: conversation._id,
       sender: adminUserId._id,
       content: `{${participantId}} has been removed from the conversation`,
-      messageStatus: 'delivered',
-      messageType: 'log',
+      messageStatus: MessageStatus.DELIVERED,
+      seenBy: [userId],
+      messageType: MessageTypes.LOG,
     })
 
     // this if for latest msg of the conversation regarding the user removed 
