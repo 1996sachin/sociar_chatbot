@@ -1,26 +1,31 @@
 import { Injectable, Scope } from '@nestjs/common';
 import { getByValue } from '../utils/map.utils';
+import { Socket } from 'socket.io';
 
 @Injectable({ scope: Scope.DEFAULT })
 export class SocketStore {
-  private store: Map<string, any> = new Map();
+  private store: Map<string, Socket> = new Map();
   private userSocketStore: Map<string, string> = new Map();
 
-  add(userId, socketId, socket) {
+  add(userId: string, socketId: string, socket: Socket) {
     this.userSocketStore.set(userId, socketId);
     this.store.set(socketId, socket);
   }
 
-  getFromUser(userId) {
-    return this.get(this.userSocketStore.get(userId));
-  }
-
-  get(socketId) {
-    return this.store.get(socketId);
+   getFromUser(userId: string) {
+    const getSocket = this.userSocketStore.get(userId);
+    if (getSocket) return this.get(getSocket);
+    return;
   }
 
   has(socketId) {
     return this.store.has(socketId);
+  }
+
+  get(socketId: string): Socket | undefined {
+    const socket: Socket | undefined = this.store.get(socketId);
+    if (socket instanceof Socket) return socket;
+    return;
   }
 
   // For Test
@@ -32,8 +37,9 @@ export class SocketStore {
     return getByValue(this.userSocketStore, socketId);
   }
 
-  remove(socketId) {
-    this.userSocketStore.delete(getByValue(this.userSocketStore, socketId));
+  remove(socketId: string) {
+    const socket = getByValue(this.userSocketStore, socketId);
+    if (socket) this.userSocketStore.delete(socket);
     this.store.delete(socketId);
   }
 }

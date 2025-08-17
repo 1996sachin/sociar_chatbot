@@ -1,7 +1,6 @@
-import { InjectModel } from '@nestjs/mongoose';
 import {
   createMessageValidator,
-  updateMessageValidator,
+  fetchMessageValidator,
 } from './message.validator';
 import { MessageService } from './messages.service';
 import {
@@ -10,20 +9,26 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
-  Patch,
   Post,
   Query,
 } from '@nestjs/common';
-import { User, UserDocument } from 'src/users/entities/user.entity';
-import { Model } from 'mongoose';
+import mongoose from 'mongoose';
+import { ApiQuery } from '@nestjs/swagger';
+import { UsersService } from 'src/users/users.service';
+import { ConversationsService } from 'src/conversations/conversations.service';
 
 @Controller('messages')
 export class MessagesController {
   constructor(
+    @Inject()
     private readonly messagesService: MessageService,
-    // @InjectModel(User.name) private readonly UserModel: Model<UserDocument>,
-  ) {}
+    @Inject()
+    private readonly userService: UsersService,
+    @Inject()
+    private readonly conversationService: ConversationsService,
+  ) { }
 
   @Post()
   async create(
@@ -36,7 +41,9 @@ export class MessagesController {
       messageStatus?: string;
     },
   ): Promise<{ message: string; data: any }> {
-    // const data = await createMessageValidator(this.UserModel).parseAsync(body);
+    const data = await createMessageValidator(
+      this.userService.getRepository(),
+    ).parseAsync(body);
 
     // const createdMessage = await this.messagesService.createMessage({
     //   senderId: data.senderId,
@@ -52,41 +59,50 @@ export class MessagesController {
   }
 
   @Get(':conversationId')
-  findAll(
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number',
+    example: '1',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    example: '10',
+    description: 'Number of data to be fetched',
+  })
+  async findAll(
     @Param('conversationId') conversationId: string,
-    @Query('page') page: string,
-    @Query('limit') limit: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
   ) {
-    return this.messagesService.fetchMessages(page, limit, conversationId);
-  }
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.messagesService.find(id);
-  }
-
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: unknown) {
-    const data = updateMessageValidator.safeParse(body);
-    if (!data.success) {
-      throw new BadRequestException(data.error.format());
+    const data = { conversationId, page, limit };
+    const parsedData = await fetchMessageValidator(
+      this.conversationService.getRepository(),
+    ).safeParseAsync(data);
+    if (!parsedData.success) {
+      throw new BadRequestException(parsedData.error.format());
     }
-    const updated = await this.messagesService.update(id, data.data);
 
-    return {
-      message: 'Message updated successfully',
-      data: updated,
-    };
+    return this.messagesService.fetchMessages(
+      parsedData.data.conversationId,
+      parsedData.data.page,
+      parsedData.data.limit,
+    );
   }
 
-  @Delete(':id')
-  async remove(
-    @Param('id') id: string,
-  ): Promise<{ message: string; data: any }> {
-    const deletedMessage = await this.messagesService.delete(id);
+  @Delete()
+  async dropDb() {
+    await mongoose.connect(process.env.DATABASE_URL!);
 
+    const db = mongoose.connection.db;
+
+    await db?.dropCollection('conversations');
+    await db?.dropCollection('messages');
+    await db?.dropCollection('conversationparticipants');
+    await db?.dropCollection('users');
     return {
-      message: 'Message deleted successfully',
-      data: deletedMessage,
+      message: 'All four collection dropped successfully',
     };
   }
 }

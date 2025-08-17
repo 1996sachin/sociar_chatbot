@@ -1,6 +1,5 @@
 import { Module, Scope } from '@nestjs/common';
 import { ConversationParticipantService } from './conversation-participant.service';
-import { ConversationParticipantController } from './conversation-participant.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import {
   ConversationParticipant,
@@ -36,4 +35,4 @@ import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module
   ],
   exports: [ConversationParticipantService],
 })
-export class ConversationParticipantModule {}
+export class ConversationParticipantModule { }

@@ -1,25 +1,21 @@
-import {
-  Body,
-  Inject,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Body, forwardRef, Inject, Injectable } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
-import { BaseService } from 'src/base.service';
-import { MessageDocument, Message } from './entities/message.entity';
+import { BaseService } from 'src/common/service/base.service';
+import {
+  MessageDocument,
+  Message,
+  MessageStatus,
+} from './entities/message.entity';
 import { InjectModel } from '@nestjs/mongoose';
-import bcrypt from 'bcrypt';
 import { ConversationsService } from 'src/conversations/conversations.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
-import { object } from 'zod/v3';
 
 @Injectable()
 export class MessageService extends BaseService<MessageDocument> {
   constructor(
     @InjectModel(Message.name)
     private readonly MessageModel: Model<MessageDocument>,
-    @Inject()
+    @Inject(forwardRef(() => ConversationsService))
     private readonly ConversationService: ConversationsService,
     @Inject()
     private readonly ConversationParticipantService: ConversationParticipantService,
@@ -37,155 +33,231 @@ export class MessageService extends BaseService<MessageDocument> {
       messageStatus?: string;
     },
   ) {
-    try {
-      let { senderId, recieverId, content, conversationId } = body;
+    let { senderId, recieverId, content, conversationId } = body;
 
-      const conversationExists =
-        await this.ConversationService.getRepository().findById(conversationId);
+    const conversationExists =
+      await this.ConversationService.find(conversationId);
 
-      if (!conversationExists || conversationExists === null) {
-        const newConv = await this.ConversationService.getRepository().create({
-          participants: [],
-          lastMessage: content,
-        });
-
-        conversationId = newConv._id as string;
-      } else {
-        conversationId = conversationExists._id as string;
-      }
-
-      const senderParticipant =
-        await this.ConversationParticipantService.getRepository().findOneAndUpdate(
-          {
-            conversation: new Types.ObjectId(conversationId),
-            user: new Types.ObjectId(senderId),
-          },
-          {
-            conversation: new Types.ObjectId(conversationId),
-            user: new Types.ObjectId(senderId),
-          },
-          { upsert: true, new: true },
-        );
-
-      const receiverParticipant =
-        await this.ConversationParticipantService.getRepository().findOneAndUpdate(
-          {
-            conversation: new Types.ObjectId(conversationId),
-            user: new Types.ObjectId(recieverId),
-          },
-          {
-            conversation: new Types.ObjectId(conversationId),
-            user: new Types.ObjectId(recieverId),
-          },
-          { upsert: true, new: true },
-        );
-
-      const conversationParticipant = [senderParticipant, receiverParticipant];
-      const participantsIds = conversationParticipant.map((p) => p._id);
-
-      await this.ConversationService.getRepository()
-        .findByIdAndUpdate(
-          new Types.ObjectId(conversationId),
-          {
-            $addToSet: {
-              participants: { $each: participantsIds },
-            },
-            $set: { lastMessage: content },
-          },
-          { new: true },
-        )
-        .exec();
-
-      const newMessage = await this.getRepository().create({
-        sender: new Types.ObjectId(senderId),
-        content: content,
-        conversation: new Types.ObjectId(conversationId),
-        messageStatus: 'sent',
+    if (!conversationExists || conversationExists === null) {
+      const newConv = await this.ConversationService.save({
+        participants: [],
+        lastMessage: content,
       });
-
-      return {
-        message: 'Message created successfully',
-        data: newMessage,
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
-      }
+      conversationId = newConv._id as string;
+    } else {
+      conversationId = conversationExists._id as string;
     }
-  }
 
-  async fetchMessages(page: string, limit: string, conversationId: string) {
-    try {
-      const pageNum = parseInt(page, 10) || 1;
-      const limitNum = parseInt(limit, 10) || 10;
-      const offset = (pageNum - 1) * limitNum;
-
-      try {
-        const conversation =
-          await this.ConversationService.find(conversationId);
-        console.log('conversation', conversation);
-        if (!conversation) throw new NotFoundException('Invalid Conversation');
-      } catch {
-        throw new NotFoundException('Invalid Conversation');
-      }
-
-      await this.getRepository().updateMany(
+    const senderParticipant =
+      await this.ConversationParticipantService.getRepository().findOneAndUpdate(
         {
           conversation: new Types.ObjectId(conversationId),
-          messageStatus: { $ne: 'delivered' },
+          user: new Types.ObjectId(senderId),
         },
         {
-          $set: { messageStatus: 'delivered' },
+          conversation: new Types.ObjectId(conversationId),
+          user: new Types.ObjectId(senderId),
         },
+        { upsert: true, new: true },
       );
 
-      const newData = await this.getRepository()
-        .aggregate([
-          {
-            $match: { conversation: new Types.ObjectId(conversationId) },
-          },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'sender',
-              foreignField: '_id',
-              as: 'userId',
-            },
-          },
-          {
-            $addFields: {
-              sender: {
-                $arrayElemAt: ['$userId.userId', 0],
-              },
-            },
-          },
-          {
-            $unset: 'userId', // Remove the lookup field
-          },
-          {
-            $sort: { createdAt: -1 },
-          },
-          {
-            $skip: offset,
-          },
-          {
-            $limit: limitNum,
-          },
-          { $project: { conversation: 0 } },
-        ])
-        .exec();
-
-      return {
-        message: 'Messages fetched',
-        data: {
-          conversation: conversationId,
-          messages: newData,
+    const receiverParticipant =
+      await this.ConversationParticipantService.getRepository().findOneAndUpdate(
+        {
+          conversation: new Types.ObjectId(conversationId),
+          user: new Types.ObjectId(recieverId),
         },
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        throw new InternalServerErrorException(error.message);
-      }
-    }
+        {
+          conversation: new Types.ObjectId(conversationId),
+          user: new Types.ObjectId(recieverId),
+        },
+        { upsert: true, new: true },
+      );
+
+    const conversationParticipant = [senderParticipant, receiverParticipant];
+    const participantsIds = conversationParticipant.map((p) => p._id);
+
+    await this.ConversationService.getRepository()
+      .findByIdAndUpdate(
+        new Types.ObjectId(conversationId),
+        {
+          $addToSet: {
+            participants: { $each: participantsIds },
+          },
+          $set: { lastMessage: content },
+        },
+        { new: true },
+      )
+      .exec();
+
+    const newMessage = await this.save({
+      sender: new Types.ObjectId(senderId),
+      content: content,
+      conversation: new Types.ObjectId(conversationId),
+      messageStatus: 'sent',
+    });
+
+    return {
+      message: 'Message created successfully',
+      data: newMessage,
+    };
+  }
+
+  async fetchMessages(conversationId: string, page?: string, limit?: string) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 10;
+    const offset = (pageNum - 1) * limitNum;
+
+    const requestBody = {
+      conversationId,
+      page,
+      limit,
+    };
+
+    // await this.getRepository().updateMany(
+    //   {
+    //     conversation: new Types.ObjectId(conversationId),
+    //     messageStatus: { $ne: 'delivered' },
+    //   },
+    //   {
+    //     $set: { messageStatus: 'delivered' },
+    //   },
+    // );
+
+    const newData = await this.getRepository()
+      .aggregate([
+        {
+          $match: { conversation: new Types.ObjectId(conversationId) },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'sender',
+            foreignField: '_id',
+            as: 'userId',
+          },
+        },
+        {
+          $addFields: {
+            sender: {
+              $arrayElemAt: ['$userId.userId', 0],
+            },
+          },
+        },
+        {
+          $unset: 'userId',
+        },
+        {
+          $sort: { createdAt: -1 },
+        },
+        {
+          $skip: offset,
+        },
+        {
+          $limit: limitNum,
+        },
+        { $project: { conversation: 0 } },
+      ])
+      .exec();
+    //TODO: Later take the conversationInfo from the validator rule
+    const conversationInfo =
+      await this.ConversationService.find(conversationId);
+    const group = conversationInfo!.participants.length > 2;
+    return {
+      message: 'Messages fetched',
+      data: {
+        conversation: conversationId,
+        messages: newData.map((data) => ({ ...data, group })),
+      },
+    };
+  }
+
+  async seenMessage(conversationId: string, userId: string) {
+    // fetching the messages in descending order to pick the latest message
+    const messages = await this.getRepository()
+      .find({ conversation: new Types.ObjectId(conversationId) })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .lean();
+
+    // function rto remove the seen status from the previous message after seeing the latest message
+    await this.getRepository().updateMany(
+      {
+        conversation: messages[0].conversation,
+        _id: { $ne: messages[0]._id },
+      },
+      { $pull: { seenBy: userId } },
+    );
+
+    // adding the seen status on the latest message of a particular user
+    const messagesAfterSeen = await this.getRepository().findByIdAndUpdate(
+      {
+        _id: messages[0]._id,
+      },
+      {
+        $addToSet: { seenBy: userId },
+      },
+      { new: true },
+    );
+
+    return messagesAfterSeen;
+  }
+
+  async changeMessageStatus(conversationId: string, userId: string) {
+    // fetching the messages in descending order to pick the latest message
+    // const messages = await this.getRepository()
+    //   .find({ conversation: new Types.ObjectId(conversationId) })
+    //   .sort({ createdAt: -1 })
+    //   .limit(1)
+    //   .lean();
+
+    const messages = await this.getRepository().aggregate([
+      {
+        $match: {
+          conversation: new Types.ObjectId(conversationId),
+          messageStatus: {
+            $in: ['delivered', 'sent'],
+          },
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          foreignField: '_id',
+          localField: 'sender',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $match: {
+          'user.userId': { $ne: userId },
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+        },
+      },
+    ]);
+    if (!messages.length) return;
+
+    const messageIds = messages.map((doc) => doc._id);
+
+    // adding the seen status on the latest message of a particular user
+    await this.getRepository().updateMany(
+      { _id: { $in: messageIds } },
+      {
+        $set: { messageStatus: MessageStatus.SEEN },
+      },
+    );
+
+    const updatedMessages = await this.getRepository().find({
+      _id: { $in: messageIds },
+    });
+    return updatedMessages;
   }
 }

@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConversationsModule } from './conversations/conversations.module';
 import { ConfigModule } from '@nestjs/config';
@@ -22,7 +21,6 @@ import { TenantDatabaseModule } from './tenant-database/tenant-database.module';
     ChatModule,
     TenantDatabaseModule,
   ],
-  controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}

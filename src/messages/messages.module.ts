@@ -1,4 +1,4 @@
-import { Module, Scope } from '@nestjs/common';
+import { forwardRef, Module, Scope } from '@nestjs/common';
 import { MessageService } from './messages.service';
 import { MessagesController } from './messages.controller';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -14,7 +14,7 @@ import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module
     // MongooseModule.forFeature([{ name: 'Message', schema: MessageSchema }]),
     TenantDatabaseModule,
     UsersModule,
-    ConversationsModule,
+    forwardRef(() => ConversationsModule),
     ConversationParticipantModule,
   ],
   controllers: [MessagesController],
@@ -29,4 +29,4 @@ import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module
   ],
   exports: [MessageService],
 })
-export class MessagesModule {}
+export class MessagesModule { }

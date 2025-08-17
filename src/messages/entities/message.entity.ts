@@ -4,7 +4,13 @@ import { Types, Document } from 'mongoose';
 export enum MessageStatus {
   SENT = 'sent',
   DELIVERED = 'delivered',
-  READ = 'read',
+  SEEN = 'seen',
+}
+
+export enum MessageTypes {
+  LOG = 'log',
+  TEXT = 'text',
+  MEDIA = 'media',
 }
 
 export type MessageDocument = Message & Document;
@@ -22,6 +28,12 @@ export class Message {
 
   @Prop({ required: true, enum: MessageStatus })
   messageStatus: MessageStatus;
+
+  @Prop({})
+  seenBy: string[];
+
+  @Prop({ default: MessageTypes.TEXT })
+  messageType: MessageTypes;
 }
 
 export const MessageSchema = SchemaFactory.createForClass(Message);
