@@ -1,4 +1,5 @@
 import { MessageStatus, MessageTypes } from "src/messages/entities/message.entity"
+import { string } from "zod"
 
 export enum SocketEvents {
   STATUS_UPDATE = 'statusUpdate',
@@ -11,7 +12,7 @@ export enum SocketEvents {
 
 export interface SocketPayloads {
   [SocketEvents.ERROR]: {
-    data: any,
+    data: {},
   },
   [SocketEvents.LOG_MESSAGE]: {
     conversationId: string,
@@ -28,12 +29,21 @@ export interface SocketPayloads {
   [SocketEvents.STATUS_UPDATE]: {
     conversationId: string,
     group: boolean,
-    messageId: string,
+    messageId?: string,
     messageStatus: MessageStatus,
-    seenBy: string[]
+    seenBy?: string[]
   },
   [SocketEvents.CONVERSATION_INFO]: {
     data: any
+  },
+  [SocketEvents.MESSAGE]: {
+    message: string,
+    createdAt: any,
+    new: boolean,
+    group: boolean,
+    conversationId: string,
+    userId: string,
+    participants: string[]
   },
 
 }

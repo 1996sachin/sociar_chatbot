@@ -34,7 +34,7 @@ import { CustomLogger } from 'src/config/custom.logger';
 import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
 import { SocketStore } from './socket.store';
-import { SocketEvents } from 'src/common/constants/socket-events';
+import { SocketEvents, SocketPayloads } from 'src/common/constants/socket-events';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -71,7 +71,10 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody(
       new ZodValidationPipe(
         initializeChatSchema,
-        (error) => new WsException({ event: SocketEvents.ERROR, data: error }),
+        (error) => new WsException({
+          event: SocketEvents.ERROR,
+          data: { error: error.format() } as SocketPayloads[SocketEvents.ERROR]['data'],
+        }),
       ),
     )
     data: InitializeChatDto,
@@ -162,7 +165,10 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody(
       new ZodValidationPipe(
         createConversationSchema,
-        (error) => new WsException({ event: SocketEvents.ERROR, data: error }),
+        (error) => new WsException({
+          event: SocketEvents.ERROR,
+          data: { error: error.format() } as SocketPayloads[SocketEvents.ERROR]['data']
+        }),
       ),
     )
     data: CreateConversationDto,
@@ -185,7 +191,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (allParticipants.length < 2)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid participants' },
+        data: { message: 'Invalid participants' } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     //Check if participants exists
@@ -237,7 +243,10 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody(
       new ZodValidationPipe(
         sendMessageSchema,
-        (error) => new WsException({ event: SocketEvents.ERROR, data: error }),
+        (error) => new WsException({
+          event: SocketEvents.ERROR,
+          data: { error: error.format() } as SocketPayloads[SocketEvents.ERROR]['data']
+        }),
       ),
     )
     data: SendMessageDto,
@@ -248,7 +257,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (!userId)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Initiate socket connection' },
+        data: { message: 'Initiate socket connection' } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     const { conversationId, message } = data;
@@ -258,7 +267,8 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (!conversation)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' },
+        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data']
+        ,
       };
 
     // Get participants & Check If user is part of conversation
@@ -269,7 +279,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (!participants)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' },
+        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data']
       };
 
     // Code for making seen if user directly sends message without seen
@@ -282,17 +292,20 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (lastMessage && !lastMessage.seenBy.includes(userId)) {
       // for removing the previous seen status in the message after pushing a new message
       await this.messageService.changeMessageStatus(conversationId, userId);
+
+      const payload: SocketPayloads[SocketEvents.STATUS_UPDATE] = {
+        conversationId: conversationId,
+        group: conversation.participants.length > 2 ? true : false,
+        messageId: lastMessage?._id as string,
+        messageStatus: MessageStatus.SEEN,
+        seenBy: [...lastMessage?.seenBy, userId],
+      }
+
       this.chatService.emitToFilteredSocket(
         SocketEvents.STATUS_UPDATE,
         participants,
         userId,
-        {
-          conversationId: conversationId,
-          group: conversation.participants.length > 2 ? true : false,
-          messageId: lastMessage?._id,
-          messageStatus: MessageStatus.SEEN,
-          seenBy: [...lastMessage?.seenBy, userId],
-        },
+        payload
       );
     }
 
@@ -312,21 +325,25 @@ export class ChatGateway implements OnGatewayDisconnect {
     await this.messageService.seenMessage(conversationId, userId);
 
     // If the user is in online "notify" that user with message
+
+    const payload: SocketPayloads[SocketEvents.MESSAGE] = {
+      message: data.message,
+      createdAt: (messageInfo as any).createdAt,
+      new: conversation.lastMessage ? false : true,
+      group: conversation.participants.length > 2 ? true : false,
+      conversationId: conversationId,
+      userId: userId,
+      participants: participants.map(
+        (participant) => participant.userDetail[0].userId,
+      ),
+
+    }
+
     const emittedSockets = this.chatService.emitToFilteredSocket(
       SocketEvents.MESSAGE,
       participants,
       userId,
-      {
-        message: data.message,
-        createdAt: (messageInfo as any).createdAt,
-        new: conversation.lastMessage ? false : true,
-        group: conversation.participants.length > 2 ? true : false,
-        conversationId: conversationId,
-        userId: userId,
-        participants: participants.map(
-          (participant) => participant.userDetail[0].userId,
-        ),
-      },
+      payload
     );
 
     if (emittedSockets <= 0) return;
@@ -340,11 +357,13 @@ export class ChatGateway implements OnGatewayDisconnect {
       },
       { new: true },
     );
-    this.chatService.emitToSocket(SocketEvents.STATUS_UPDATE, participants, {
+    const payloadd: SocketPayloads[SocketEvents.STATUS_UPDATE] = {
       conversationId: conversationId,
       group: conversation.participants.length > 2 ? true : false,
       messageStatus: MessageStatus.DELIVERED,
-    });
+
+    }
+    this.chatService.emitToSocket(SocketEvents.STATUS_UPDATE, participants, payloadd);
   }
 
   @SubscribeMessage('seenMessage')
@@ -356,7 +375,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (!userId)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Initiate socket connection' },
+        data: { message: 'Initiate socket connection' } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     const { conversationId } = data;
@@ -366,7 +385,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (!conversation)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'No any conversation with such id found' },
+        data: { message: 'No any conversation with such id found' } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     // Get participants of conversation
@@ -375,7 +394,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (!participants)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' },
+        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     // using the seen logic from the message service
@@ -394,13 +413,16 @@ export class ChatGateway implements OnGatewayDisconnect {
       .sort({ createdAt: -1 })
       .lean();
 
-    this.chatService.emitToSocket(SocketEvents.STATUS_UPDATE, participants, {
+    const payload: SocketPayloads[SocketEvents.STATUS_UPDATE] = {
       conversationId: conversationId,
-      messageId: messages[0]._id,
+      messageId: messages[0]._id as string,
       group: conversation.participants.length > 2 ? true : false,
       messageStatus: MessageStatus.SEEN,
       seenBy: updatedMessage!.seenBy,
-    });
+
+    }
+
+    this.chatService.emitToSocket(SocketEvents.STATUS_UPDATE, participants, payload);
   }
 
 }

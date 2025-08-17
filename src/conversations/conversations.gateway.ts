@@ -70,7 +70,8 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!currentUser) {
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Initiate socket connection' },
+        data: { message: 'Initiate socket connection' } as SocketPayloads[SocketEvents.ERROR]['data']
+        ,
       };
     }
 
@@ -83,7 +84,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!currentUserDetails) {
       return {
         event: SocketEvents.WARNING,
-        message: 'No such user found',
+        message: 'No such user found' as SocketPayloads[SocketEvents.WARNING]['message'],
       };
     }
 
@@ -94,7 +95,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!conversation)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'No any conversation with such id found' },
+        data: { message: 'No any conversation with such id found' } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     // finding mongoose userId of the user
@@ -105,7 +106,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!participantDetails) {
       return {
         event: SocketEvents.WARNING,
-        message: 'no such user found',
+        message: 'no such user found' as SocketPayloads[SocketEvents.MESSAGE]['message'],
       };
     }
 
@@ -115,7 +116,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!participants || participants.length === 0) {
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' },
+        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
     }
 
@@ -129,7 +130,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
       if (participantPartOfConv.length !== 0) {
         return {
           event: SocketEvents.WARNING,
-          message: 'participant is already part of this conversation',
+          message: 'participant is already part of this conversation' as SocketPayloads[SocketEvents.WARNING]['message'],
         };
       }
 
@@ -173,7 +174,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
       if (!newConversation) {
         return {
           event: SocketEvents.WARNING,
-          message: 'something went wrong while creating the conversation',
+          message: 'something went wrong while creating the conversation' as SocketPayloads[SocketEvents.WARNING]['message'],
         };
       }
 
@@ -226,7 +227,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!currentUser) {
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Initiate socket connection' }
+        data: { message: 'Initiate socket connection' } as SocketPayloads[SocketEvents.ERROR]['data']
       }
     }
 
@@ -239,7 +240,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!participants) {
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' }
+        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data']
       }
     }
 
@@ -289,14 +290,14 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!participants)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' },
+        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     await this.conversationService.removeParticipant(conversationId, currentUser, participantId)
 
     const lastMessage = await this.messageService.getLastMessage(conversationId)
 
-    this.chatService.emitToFilteredSocket(SocketEvents.LOG_MESSAGE, participants, currentUser as string, {
+    const payload: SocketPayloads[SocketEvents.LOG_MESSAGE] = {
       conversationId: conversationId,
       group: participants.length > 2 ? true : false,
       messageId: lastMessage[0]._id,
@@ -304,7 +305,10 @@ export class ConversationsGateway implements OnGatewayDisconnect {
       messageStatus: MessageStatus.SEEN,
       userId: currentUser,
       messageType: lastMessage[0].messageType
-    })
+
+    }
+
+    this.chatService.emitToFilteredSocket(SocketEvents.LOG_MESSAGE, participants, currentUser as string, payload)
   }
 
   @SubscribeMessage('renameConversation')
@@ -321,7 +325,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!currentUser) {
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Initiate socket connection' }
+        data: { message: 'Initiate socket connection' } as SocketPayloads[SocketEvents.ERROR]['data']
       }
     }
 
@@ -332,7 +336,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     if (!participants) {
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' }
+        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data']
       }
     }
 
@@ -340,7 +344,7 @@ export class ConversationsGateway implements OnGatewayDisconnect {
 
     const lastMessage = await this.messageService.getLastMessage(conversationId)
 
-    this.chatService.emitToFilteredSocket(SocketEvents.LOG_MESSAGE, participants, currentUser as string, {
+    const payload: SocketPayloads[SocketEvents.LOG_MESSAGE] = {
       conversationId: conversationId,
       group: participants.length > 2 ? true : false,
       messageId: lastMessage[0]._id,
@@ -348,7 +352,10 @@ export class ConversationsGateway implements OnGatewayDisconnect {
       messageStatus: MessageStatus.SEEN,
       userId: currentUser,
       messageType: lastMessage[0].messageType
-    })
+
+    }
+
+    this.chatService.emitToFilteredSocket(SocketEvents.LOG_MESSAGE, participants, currentUser as string, payload)
 
   }
 }
