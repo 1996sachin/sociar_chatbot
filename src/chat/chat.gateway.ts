@@ -4,6 +4,7 @@
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
@@ -37,6 +38,7 @@ import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
 import { SocketEvents, SocketPayloads } from 'src/common/constants/socket-events';
 import { SocketStore } from 'src/common/socket/socket.store';
+import { TenantServiceFactory } from 'src/tenant-database/tenant-database.service';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -48,24 +50,34 @@ const logger = new CustomLogger('Chat Gateway');
     credentials: true,
   },
 })
-export class ChatGateway implements OnGatewayDisconnect {
+export class ChatGateway implements OnGatewayDisconnect, OnGatewayConnection {
   @WebSocketServer()
   server: Server;
 
   constructor(
     private readonly socketStore: SocketStore,
     // private readonly userService: UsersService,
-    private readonly chatService: ChatService,
+    // private readonly chatService: ChatService,
     // private readonly conversationService: ConversationsService,
     // private readonly messageService: MessageService,
     // private readonly conversationPService: ConversationParticipantService,
-    private readonly moduleRef: ModuleRef, // to resolve request-scoped deps
+    private readonly tenantServiceFactory: TenantServiceFactory,
   ) {}
+
+  async handleConnection(client: Socket) {
+    const tenantId = client.handshake.headers['x-tenant-id'];
+    console.log(`New socket for tenant ${tenantId}`);
+    const { userService } =
+      await this.tenantServiceFactory.getServicesForTenant(tenantId as string);
+    console.log('userService', userService);
+    const users = await userService.findAll({});
+    console.log('users', users);
+  }
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
     logger.debug(`[disconnected] ${client.id}`);
-    this.socketStore.remove(client.id);
+    // this.socketStore.remove(client.id);
   }
 
   @SubscribeMessage('init')
@@ -85,37 +97,12 @@ export class ChatGateway implements OnGatewayDisconnect {
     logger.debug(`[connected] socket: ${client.id}, userId: ${data.userId}`);
 
     const tenant = client.handshake.headers['x-tenant-id'];
-
-    // Create a fake request context for this socket
-    const contextId = ContextIdFactory.create();
-    (this.moduleRef as any).registerRequestByContextId(
-      { headers: { 'x-tenant-id': tenant } },
-      contextId,
-    );
-
-    // Resolve your request-scoped services
-    const userService = await this.moduleRef.resolve(UsersService, contextId, {
-      strict: false,
-    });
-    const conversationService = await this.moduleRef.resolve(
-      ConversationsService,
-      contextId,
-      { strict: false },
-    );
-    const messageService = await this.moduleRef.resolve(
-      MessageService,
-      contextId,
-      { strict: false },
-    );
-
-    console.log('this.socketStore', this.socketStore); // will work
-    console.log('userService', userService); // will work
-    console.log('conversationService', conversationService); // will work
+    console.log('tenant', tenant);
 
     // console.log('this.socket', this.socketStore);
     // console.log('userService', this.userService);
     // console.log('this.conversationService', this.conversationService);
-    if (this.socketStore.has(client.id)) this.socketStore.remove(client.id);
+    /* if (this.socketStore.has(client.id)) this.socketStore.remove(client.id);
     this.socketStore.add(data.userId, client.id, client);
     await this.userService.saveIfNotExists({ userId: data.userId });
 
@@ -190,10 +177,10 @@ export class ChatGateway implements OnGatewayDisconnect {
       .updateMany(
         { conversation: { $in: notOurMessages } },
         { $set: { messageStatus: MessageStatus.DELIVERED } },
-      );
+      ); */
   }
 
-  @SubscribeMessage('createConversation')
+  /* @SubscribeMessage('createConversation')
   async createConversation(
     @MessageBody(
       new ZodValidationPipe(

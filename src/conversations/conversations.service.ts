@@ -225,12 +225,9 @@ export class ConversationsService extends BaseService<ChatDocument> {
   }
 
   async leaveConversation(conversationId: string, userId: string) {
-
     const mongooseUserId = await this.UserService.getRepository().findOne({
       userId: userId,
     });
-
-
 
     if (!mongooseUserId) {
       throw new BadRequestException('No user with such userId found');
@@ -255,7 +252,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
       );
     }
 
-
     if (conversation.conversationType === 'group') {
       await this.conversationPService.delete(convParticipant[0]._id);
       await this.getRepository().updateOne(
@@ -263,9 +259,9 @@ export class ConversationsService extends BaseService<ChatDocument> {
           _id: conversation._id,
         },
         {
-          $pull: { participants: convParticipant[0]._id }
-        }
-      )
+          $pull: { participants: convParticipant[0]._id },
+        },
+      );
 
       // this is log for leaving the conversation
       const leaveLog = await this.messageService.save({
@@ -281,67 +277,83 @@ export class ConversationsService extends BaseService<ChatDocument> {
       // this if for latest msg of the conversation regarding the user left
       await this.updateWhere(
         {
-          _id: conversation._id
+          _id: conversation._id,
         },
         {
-          lastMessage: leaveLog.content
-        }
-      )
+          lastMessage: leaveLog.content,
+        },
+      );
 
       return {
-        message: "Conversation left successfully."
-      }
+        message: 'Conversation left successfully.',
+      };
     } else {
-      throw new BadRequestException('User cannot leave peer to peer conversation')
+      throw new BadRequestException(
+        'User cannot leave peer to peer conversation',
+      );
     }
   }
 
-  async removeParticipant(conversationId: string, userId: string, participantId: string) {
-
-    const conversation = await this.getRepository().findOne({ _id: conversationId })
+  async removeParticipant(
+    conversationId: string,
+    userId: string,
+    participantId: string,
+  ) {
+    const conversation = await this.getRepository().findOne({
+      _id: conversationId,
+    });
 
     if (!conversation) {
-      throw new BadRequestException('No conversation with such userId found')
+      throw new BadRequestException('No conversation with such userId found');
     }
 
-    if (conversation.conversationType !== "group") {
-      throw new BadRequestException('Cannot remove participant from the private conversation')
+    if (conversation.conversationType !== 'group') {
+      throw new BadRequestException(
+        'Cannot remove participant from the private conversation',
+      );
     }
 
-    const participantUserId = await this.UserService.getRepository().findOne({ userId: participantId })
-    const adminUserId = await this.UserService.getRepository().findOne({ userId: userId })
+    const participantUserId = await this.UserService.getRepository().findOne({
+      userId: participantId,
+    });
+    const adminUserId = await this.UserService.getRepository().findOne({
+      userId: userId,
+    });
 
     if (!participantUserId || !adminUserId) {
-      throw new BadRequestException('No user with such userId found')
+      throw new BadRequestException('No user with such userId found');
     }
 
-    if (!conversation.createdBy.equals(adminUserId?._id as string)) {
-      throw new BadRequestException('Only admin can remove participants')
+    if (!conversation.createdBy.equals(adminUserId?._id.toString() as string)) {
+      throw new BadRequestException('Only admin can remove participants');
     }
 
-    const convParticipant = await this.conversationPService.findWhere(
-      {
-        conversation: conversation._id,
-        user: participantUserId._id
-      }
-    )
+    const convParticipant = await this.conversationPService.findWhere({
+      conversation: conversation._id,
+      user: participantUserId._id,
+    });
 
     if (!convParticipant) {
-      throw new BadRequestException('There is no any conversation participants with such conversation id and user id')
+      throw new BadRequestException(
+        'There is no any conversation participants with such conversation id and user id',
+      );
     }
 
     if (userId === participantId) {
-      throw new BadRequestException('Admin cannot remove themselve from the conversation')
+      throw new BadRequestException(
+        'Admin cannot remove themselve from the conversation',
+      );
     }
 
-    await this.conversationPService.delete(convParticipant[0]._id)
-    await this.getRepository().updateOne({
-      _id: conversation._id
-    },
+    await this.conversationPService.delete(convParticipant[0]._id);
+    await this.getRepository().updateOne(
       {
-        $pull: { participants: convParticipant[0]._id }
-      }
-    )
+        _id: conversation._id,
+      },
+      {
+        $pull: { participants: convParticipant[0]._id },
+      },
+    );
 
     // this is log for leaving the conversation
     const leaveLog = await this.messageService.save({
@@ -353,18 +365,18 @@ export class ConversationsService extends BaseService<ChatDocument> {
       messageType: MessageTypes.LOG,
     })
 
-    // this if for latest msg of the conversation regarding the user removed 
+    // this if for latest msg of the conversation regarding the user removed
     await this.updateWhere(
       {
-        _id: conversation._id
+        _id: conversation._id,
       },
       {
-        lastMessage: leaveLog.content
-      }
-    )
+        lastMessage: leaveLog.content,
+      },
+    );
 
     return {
-      message: "Participant removed successfully."
-    }
+      message: 'Participant removed successfully.',
+    };
   }
 }

@@ -19,9 +19,9 @@ import { SocketModule } from 'src/common/socket/socket.module';
 
 @Module({
   imports: [
-    // MongooseModule.forFeature([
-    //   { name: 'Conversation', schema: ConversationSchema },
-    // ]),
+    MongooseModule.forFeature([
+      { name: 'Conversation', schema: ConversationSchema },
+    ]),
     TenantDatabaseModule,
     UsersModule,
     ConversationParticipantModule,

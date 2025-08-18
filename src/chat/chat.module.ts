@@ -7,10 +7,15 @@ import { MessagesModule } from 'src/messages/messages.module';
 import { UsersModule } from 'src/users/users.module';
 import { SocketModule } from 'src/common/socket/socket.module';
 import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { ConversationSchema } from 'src/conversations/entities/conversation.entity';
 
 @Module({
   imports: [
     SocketModule,
+    MongooseModule.forFeature([
+      { name: 'Conversation', schema: ConversationSchema },
+    ]),
     TenantDatabaseModule,
     ConversationsModule,
     ConversationParticipantModule,

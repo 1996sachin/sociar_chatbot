@@ -10,7 +10,6 @@ import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module
     TenantDatabaseModule,
     // MongooseModule.forFeature([{ name: 'User', schema: UserSchema } ]),
   ],
-  controllers: [UsersController],
   providers: [
     UsersService,
     {

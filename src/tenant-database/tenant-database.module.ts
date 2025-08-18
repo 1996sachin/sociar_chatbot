@@ -1,8 +1,9 @@
-import { Global, MiddlewareConsumer, Module, Scope } from '@nestjs/common';
+import { MiddlewareConsumer, Module, Scope } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { Connection } from 'mongoose';
 import { TenantDatabaseMiddleware } from './tenant-database.middleware';
 import { getConnectionToken, MongooseModule } from '@nestjs/mongoose';
+import { TenantServiceFactory } from './tenant-database.service';
 
 const tenantProviders = [
   {
@@ -19,6 +20,7 @@ const tenantProviders = [
       return connectionDb;
     },
   },
+  TenantServiceFactory,
 ];
 
 @Module({

@@ -1,4 +1,4 @@
-import { Module, Scope } from '@nestjs/common';
+import { forwardRef, Module, Scope } from '@nestjs/common';
 import { ConversationParticipantService } from './conversation-participant.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import {
@@ -20,9 +20,9 @@ import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module
     // ]),
     TenantDatabaseModule,
     UsersModule,
-    ConversationsModule,
+    forwardRef(() => ConversationsModule),
+    // ConversationsModule,
   ],
-  controllers: [ConversationParticipantController],
   providers: [
     ConversationParticipantService,
     {
@@ -35,4 +35,4 @@ import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module
   ],
   exports: [ConversationParticipantService],
 })
-export class ConversationParticipantModule { }
+export class ConversationParticipantModule {}
