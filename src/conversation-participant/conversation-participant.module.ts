@@ -1,12 +1,10 @@
-import { forwardRef, Module, Scope } from '@nestjs/common';
+import { Module, Scope } from '@nestjs/common';
 import { ConversationParticipantService } from './conversation-participant.service';
-import { MongooseModule } from '@nestjs/mongoose';
 import {
   ConversationParticipant,
   ConversationParticipantSchema,
 } from './entities/conversation-participant.entity';
 import { UsersModule } from 'src/users/users.module';
-import { ConversationsModule } from 'src/conversations/conversations.module';
 import { Connection } from 'mongoose';
 import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module';
 
@@ -20,7 +18,7 @@ import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module
     // ]),
     TenantDatabaseModule,
     UsersModule,
-    forwardRef(() => ConversationsModule),
+    // forwardRef(() => ConversationsModule),
     // ConversationsModule,
   ],
   providers: [
