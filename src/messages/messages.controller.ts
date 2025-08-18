@@ -11,6 +11,7 @@ import {
   Get,
   Inject,
   Param,
+  ParseIntPipe,
   Post,
   Query,
 } from '@nestjs/common';
@@ -72,21 +73,21 @@ export class MessagesController {
   })
   async findAll(
     @Param('conversationId') conversationId: string,
-    @Query('page') page: string = '1',
-    @Query('limit') limit: string = '10',
+    @Query('page', ParseIntPipe) page?: number,
+    @Query('limit', ParseIntPipe) limit?: number,
   ) {
     const data = { conversationId, page, limit };
     const parsedData = await fetchMessageValidator(
       this.conversationService.getRepository(),
     ).safeParseAsync(data);
     if (!parsedData.success) {
-      throw new BadRequestException(parsedData.error.format());
+      throw new BadRequestException(parsedData.error.flatten().fieldErrors);
     }
 
     return this.messagesService.fetchMessages(
       parsedData.data.conversationId,
-      parsedData.data.page,
-      parsedData.data.limit,
+      String(parsedData.data.page),
+      String(parsedData.data.limit),
     );
   }
 
