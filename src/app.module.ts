@@ -19,8 +19,7 @@ import { TenantDatabaseModule } from './tenant-database/tenant-database.module';
     UsersModule,
     ConversationParticipantModule,
     ChatModule,
-    TenantDatabaseModule,
   ],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
