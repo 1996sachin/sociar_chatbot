@@ -20,4 +20,4 @@ import { ChatModule } from './chat/chat.module';
   ],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

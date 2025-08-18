@@ -8,6 +8,9 @@ import { UsersModule } from 'src/users/users.module';
 import { UsersService } from 'src/users/users.service';
 import { ConversationParticipantModule } from 'src/conversation-participant/conversation-participant.module';
 import { MessagesModule } from 'src/messages/messages.module';
+import { ConversationsGateway } from './conversations.gateway';
+import { ChatService } from 'src/chat/chat.service';
+import { SocketModule } from 'src/common/socket/socket.module';
 
 @Module({
   imports: [
@@ -16,10 +19,11 @@ import { MessagesModule } from 'src/messages/messages.module';
     ]),
     UsersModule,
     ConversationParticipantModule,
-    forwardRef(() => MessagesModule)
+    forwardRef(() => MessagesModule),
+    SocketModule
   ],
   controllers: [ConversationsController],
-  providers: [DatabaseService, ConversationsService, UsersService],
+  providers: [DatabaseService, ConversationsService, UsersService, ChatService, ConversationsGateway],
   exports: [MongooseModule, ConversationsService],
 })
 export class ConversationsModule { }
