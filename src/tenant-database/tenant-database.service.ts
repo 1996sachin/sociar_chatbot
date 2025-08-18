@@ -39,7 +39,6 @@ export class TenantServiceFactory {
     );
 
     const tenantSocketStore = new SocketStore();
-    services[ChatService.name] = new ChatService(tenantSocketStore);
     services[SocketStore.name] = tenantSocketStore;
 
     this.serviceCache.set(tenantId, services);

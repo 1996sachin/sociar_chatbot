@@ -1,7 +1,8 @@
 import {
   BadRequestException,
   Inject,
-  Injectable, NotFoundException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { Model } from 'mongoose';
 import { BaseService } from 'src/common/service/base.service';
@@ -10,7 +11,10 @@ import { InjectModel } from '@nestjs/mongoose';
 import { UsersService } from 'src/users/users.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { MessageService } from 'src/messages/messages.service';
-import { MessageStatus, MessageTypes } from 'src/messages/entities/message.entity';
+import {
+  MessageStatus,
+  MessageTypes,
+} from 'src/messages/entities/message.entity';
 
 @Injectable()
 export class ConversationsService extends BaseService<ChatDocument> {
@@ -174,12 +178,17 @@ export class ConversationsService extends BaseService<ChatDocument> {
   }
 
   // this is for renaming the group conversation
-  async renameConversation(conversationId: string, userId: string, name: string) {
-
+  async renameConversation(
+    conversationId: string,
+    userId: string,
+    name: string,
+  ) {
     const conversation = await this.find(conversationId);
 
     if (!conversation) {
-      throw new BadRequestException('No conversation with such converasiton id found')
+      throw new BadRequestException(
+        'No conversation with such converasiton id found',
+      );
     }
 
     if (conversation.participants.length <= 2) {
@@ -189,13 +198,14 @@ export class ConversationsService extends BaseService<ChatDocument> {
     }
 
     const userDetails = await this.UserService.findWhere({
-      userId: userId
-    })
+      userId: userId,
+    });
 
     if (!userDetails) {
-      throw new BadRequestException('No such user is part of this conversation')
+      throw new BadRequestException(
+        'No such user is part of this conversation',
+      );
     }
-
 
     const renameLog = await this.messageService.save({
       conversation: conversation._id,
@@ -203,25 +213,25 @@ export class ConversationsService extends BaseService<ChatDocument> {
       content: `{${userId}} renamed conversation to {${name}}`,
       messageStatus: MessageStatus.DELIVERED,
       seenBy: [userId],
-      messageType: MessageTypes.LOG
-    })
+      messageType: MessageTypes.LOG,
+    });
 
-    await this.getRepository().findByIdAndUpdate({
-      _id: conversation._id,
-    },
+    await this.getRepository().findByIdAndUpdate(
+      {
+        _id: conversation._id,
+      },
       {
         $set: {
           name: name,
-          lastMessage: renameLog.content
-        }
+          lastMessage: renameLog.content,
+        },
       },
-      { new: true }
-    )
+      { new: true },
+    );
 
     return {
       message: 'Converastion renamed successfully',
-    }
-
+    };
   }
 
   async leaveConversation(conversationId: string, userId: string) {
@@ -270,8 +280,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
         content: `{${userId}} has left the conversation`,
         messageStatus: MessageStatus.DELIVERED,
         messageType: MessageTypes.LOG,
-        seenBy: [userId]
-        ,
+        seenBy: [userId],
       });
 
       // this if for latest msg of the conversation regarding the user left
@@ -324,7 +333,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       throw new BadRequestException('No user with such userId found');
     }
 
-    if (!conversation.createdBy.equals(adminUserId?._id.toString() as string)) {
+    if (!conversation.createdBy.equals(adminUserId?._id as string)) {
       throw new BadRequestException('Only admin can remove participants');
     }
 
@@ -363,7 +372,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       messageStatus: MessageStatus.DELIVERED,
       seenBy: [userId],
       messageType: MessageTypes.LOG,
-    })
+    });
 
     // this if for latest msg of the conversation regarding the user removed
     await this.updateWhere(
