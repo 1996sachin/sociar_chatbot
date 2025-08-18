@@ -4,7 +4,6 @@
 import {
   ConnectedSocket,
   MessageBody,
-  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -21,14 +20,11 @@ import { MessageStatus, MessageTypes } from 'src/messages/entities/message.entit
 import { Conversation } from 'src/conversations/entities/conversation.entity';
 import { ValidationWithModelPipe } from 'src/common/helpers/validation-helper';
 import { type leaveConversationDto, leaveConversationSchema, type removeParticipantDto, removeParticipantSchema, renameConversationSchema, type addParticipantsDto, type renameConversationDto, initializeChatSchema, type InitializeChatDto } from 'src/chat/chat.validator';
-import { SocketStore } from 'src/chat/socket.store';
 import { ChatService } from 'src/chat/chat.service';
 import { MessageService } from 'src/messages/messages.service';
-import { CustomLogger } from 'src/config/custom.logger';
 import { SocketEvents, SocketPayloads } from 'src/common/constants/socket-events';
+import { SocketStore } from 'src/common/socket/socket.store';
 
-
-const logger = new CustomLogger('Chat Gateway');
 
 @UseFilters(new SocketExceptionFilter())
 @WebSocketGateway(Number(process.env.PORT), {
@@ -38,7 +34,7 @@ const logger = new CustomLogger('Chat Gateway');
     credentials: true,
   },
 })
-export class ConversationsGateway implements OnGatewayDisconnect {
+export class ConversationsGateway {
   @WebSocketServer()
   server: Server;
 
@@ -50,12 +46,6 @@ export class ConversationsGateway implements OnGatewayDisconnect {
     private readonly messageService: MessageService,
     private readonly conversationPService: ConversationParticipantService,
   ) {
-  }
-
-  handleDisconnect(@ConnectedSocket() client: Socket) {
-    // Remove user from online pool
-    logger.debug(`[disconnected] ${client.id}`);
-    this.socketStore.remove(client.id);
   }
 
   @SubscribeMessage('addParticipants')

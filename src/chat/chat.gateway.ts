@@ -33,8 +33,8 @@ import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter
 import { CustomLogger } from 'src/config/custom.logger';
 import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
-import { SocketStore } from './socket.store';
 import { SocketEvents, SocketPayloads } from 'src/common/constants/socket-events';
+import { SocketStore } from 'src/common/socket/socket.store';
 
 const logger = new CustomLogger('Chat Gateway');
 

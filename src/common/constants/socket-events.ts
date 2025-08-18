@@ -1,5 +1,4 @@
 import { MessageStatus, MessageTypes } from "src/messages/entities/message.entity"
-import { string } from "zod"
 
 export enum SocketEvents {
   STATUS_UPDATE = 'statusUpdate',

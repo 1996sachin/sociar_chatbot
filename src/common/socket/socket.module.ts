@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { SocketStore } from 'src/chat/socket.store';
+import { SocketStore } from './socket.store';
 
 @Module({
   providers: [SocketStore],
