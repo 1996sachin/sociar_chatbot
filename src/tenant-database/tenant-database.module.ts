@@ -13,7 +13,12 @@ const tenantProviders = [
     useFactory: async (req: Request, connection: Connection) => {
       const tenantId = req['tenantId'];
       const dbName = `tenant_${tenantId}`;
-      // console.log((await connection.listDatabases()).databases);
+      // if (
+      //   !(await connection.listDatabases()).databases
+      //     .map((db) => db.name)
+      //     .includes(dbName)
+      // )
+      //   throw new BadRequestException('Invalid tenant');
       const connectionDb = connection.useDb(dbName, {
         useCache: true,
       });
