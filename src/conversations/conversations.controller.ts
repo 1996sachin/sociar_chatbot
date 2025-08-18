@@ -54,21 +54,4 @@ export class ConversationsController {
   ) {
     return this.conversationsService.fetchConversations(id, page, limit);
   }
-
-  // endpoint for renaming the conversation
-  @Patch(':conversationId')
-  updateConversation(
-    @Param('conversationId') conversationId: string,
-    @Body()
-    body: {
-      name: string;
-    },
-  ) {
-    const data = { conversationId, body };
-    const parsedData = updateConversationValidator(
-      this.conversationsService.getRepository(),
-    ).parseAsync(data);
-
-    return this.conversationsService.update(conversationId, body);
-  }
 }

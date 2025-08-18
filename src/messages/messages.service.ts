@@ -108,21 +108,34 @@ export class MessageService extends BaseService<MessageDocument> {
     const limitNum = limit ? parseInt(limit, 10) : 10;
     const offset = (pageNum - 1) * limitNum;
 
-    const requestBody = {
-      conversationId,
-      page,
-      limit,
-    };
+    const basePipeline = [
+      {
+        $match: { conversation: new Types.ObjectId(conversationId) },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'sender',
+          foreignField: '_id',
+          as: 'userId',
+        },
+      },
+      {
+        $addFields: {
+          sender: {
+            $arrayElemAt: ['$userId.userId', 0],
+          },
+        },
+      },
+      { $project: { conversation: 0 } },
 
-    // await this.getRepository().updateMany(
-    //   {
-    //     conversation: new Types.ObjectId(conversationId),
-    //     messageStatus: { $ne: 'delivered' },
-    //   },
-    //   {
-    //     $set: { messageStatus: 'delivered' },
-    //   },
-    // );
+    ]
+
+    const totalCountResult = await this.getRepository()
+      .aggregate([...basePipeline, { $count: 'total' }])
+      .exec()
+    const totalCount = totalCountResult[0]?.total || 0
+    const totalPages = Math.ceil(totalCount / limitNum)
 
     const newData = await this.getRepository()
       .aggregate([
@@ -169,6 +182,12 @@ export class MessageService extends BaseService<MessageDocument> {
         conversation: conversationId,
         messages: newData.map((data) => ({ ...data, group })),
       },
+      pagination: {
+        totalCount,
+        totalPages,
+        currentPage: pageNum,
+        perPage: limitNum
+      }
     };
   }
 
@@ -204,12 +223,6 @@ export class MessageService extends BaseService<MessageDocument> {
   }
 
   async changeMessageStatus(conversationId: string, userId: string) {
-    // fetching the messages in descending order to pick the latest message
-    // const messages = await this.getRepository()
-    //   .find({ conversation: new Types.ObjectId(conversationId) })
-    //   .sort({ createdAt: -1 })
-    //   .limit(1)
-    //   .lean();
 
     const messages = await this.getRepository().aggregate([
       {
@@ -259,5 +272,26 @@ export class MessageService extends BaseService<MessageDocument> {
       _id: { $in: messageIds },
     });
     return updatedMessages;
+  }
+
+  async getLastMessage(conversationId: string) {
+    const lastMessage = await this.getRepository().aggregate([
+      {
+        $match: {
+          conversation: new Types.ObjectId(conversationId)
+        }
+      },
+      {
+        $sort: {
+          createdAt: -1
+        }
+      },
+      {
+        $limit: 1
+      }
+    ])
+
+    return lastMessage
+
   }
 }

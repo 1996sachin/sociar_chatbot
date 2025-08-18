@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { SocketStore } from './socket.store';
 import { Socket } from 'socket.io';
+import { SocketStore } from 'src/common/socket/socket.store';
 
 interface UserDetail {
   userId: string;

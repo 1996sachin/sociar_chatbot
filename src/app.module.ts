@@ -23,4 +23,4 @@ import { TenantDatabaseModule } from './tenant-database/tenant-database.module';
   ],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
