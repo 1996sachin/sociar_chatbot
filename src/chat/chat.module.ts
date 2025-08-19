@@ -6,10 +6,15 @@ import { ConversationParticipantModule } from 'src/conversation-participant/conv
 import { MessagesModule } from 'src/messages/messages.module';
 import { UsersModule } from 'src/users/users.module';
 import { SocketModule } from 'src/common/socket/socket.module';
+import { TenantDatabaseModule } from 'src/tenant-database/tenant-database.module';
 
 @Module({
   imports: [
     SocketModule,
+    // MongooseModule.forFeature([
+    //   { name: 'Conversation', schema: ConversationSchema },
+    // ]),
+    TenantDatabaseModule,
     ConversationsModule,
     ConversationParticipantModule,
     MessagesModule,
@@ -17,4 +22,4 @@ import { SocketModule } from 'src/common/socket/socket.module';
   ],
   providers: [ChatGateway, ChatService],
 })
-export class ChatModule { }
+export class ChatModule {}

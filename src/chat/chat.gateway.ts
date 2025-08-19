@@ -11,12 +11,8 @@ import {
   WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { MessageService } from 'src/messages/messages.service';
-import { ConversationsService } from 'src/conversations/conversations.service';
-import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
-import { UsersService } from 'src/users/users.service';
 import { Types } from 'mongoose';
-import { UseFilters } from '@nestjs/common';
+import { UseFilters, UseInterceptors } from '@nestjs/common';
 import { ZodValidationPipe } from 'src/common/pipes/zod-validation/zod-validation.pipe';
 import {
   createConversationSchema,
@@ -31,10 +27,12 @@ import type {
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
-import { ChatService } from './chat.service';
 import { MessageStatus } from 'src/messages/entities/message.entity';
-import { SocketEvents, SocketPayloads } from 'src/common/constants/socket-events';
-import { SocketStore } from 'src/common/socket/socket.store';
+import {
+  SocketEvents,
+  SocketPayloads,
+} from 'src/common/constants/socket-events';
+import { TenantDatabaseInterceptor } from 'src/tenant-database/tenant-database.interceptor';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -46,24 +44,16 @@ const logger = new CustomLogger('Chat Gateway');
     credentials: true,
   },
 })
+@UseInterceptors(TenantDatabaseInterceptor)
 export class ChatGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  constructor(
-    public readonly socketStore: SocketStore,
-    private readonly userService: UsersService,
-    private readonly chatService: ChatService,
-    private readonly conversationService: ConversationsService,
-    private readonly messageService: MessageService,
-    private readonly conversationPService: ConversationParticipantService,
-  ) {
-  }
-
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
+    const { SocketStore } = client.data.tenantServices;
     logger.debug(`[disconnected] ${client.id}`);
-    this.socketStore.remove(client.id);
+    SocketStore.remove(client.id);
   }
 
   @SubscribeMessage('init')
@@ -71,93 +61,49 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody(
       new ZodValidationPipe(
         initializeChatSchema,
-        (error) => new WsException({
-          event: SocketEvents.ERROR,
-          data: { error: error.format() } as SocketPayloads[SocketEvents.ERROR]['data'],
-        }),
+        (error) =>
+          new WsException({
+            event: SocketEvents.ERROR,
+            data: {
+              error: error.format(),
+            } as SocketPayloads[SocketEvents.ERROR]['data'],
+          }),
       ),
     )
     data: InitializeChatDto,
     @ConnectedSocket() client: Socket,
   ) {
+    const {
+      MessageService,
+      ConversationParticipantService,
+      SocketStore,
+      UsersService,
+    } = client.data.tenantServices;
+
     logger.debug(`[connected] socket: ${client.id}, userId: ${data.userId}`);
 
-    this.socketStore.remove(client.id);
-    this.socketStore.add(data.userId, client.id, client);
-    await this.userService.saveIfNotExists({ userId: data.userId });
+    SocketStore.remove(client.id);
+    SocketStore.add(data.userId, client.id, client);
+    await UsersService.saveIfNotExists({ userId: data.userId });
 
     // deliver msg after init
-    const conversationInfos = await this.conversationPService
-      .getRepository()
-      .aggregate([
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'user',
-            foreignField: '_id',
-            as: 'userDetails',
-          },
-        },
-        { $unwind: '$userDetails' },
-        {
-          $group: {
-            _id: '$conversation',
-            userDetails: { $push: '$userDetails' },
-            userIds: { $addToSet: '$userDetails.userId' },
-          },
-        },
-        { $match: { userIds: data.userId } },
-        {
-          $project: {
-            _id: 0,
-            conversation: '$_id',
-            userDetails: 1,
-            userIds: 1,
-          },
-        },
-      ]);
+    const conversationInfos =
+      await ConversationParticipantService.conversationsOfUser(data.userId);
     const conversations = conversationInfos.map(
       (conversationInfo) => conversationInfo.conversation,
     );
 
-    const latestMessages = await this.messageService.getRepository().aggregate([
-      {
-        $match: {
-          conversation: {
-            $in: conversations,
-          },
-        },
-      },
-      {
-        $sort: { createdAt: -1 },
-      },
-      {
-        $group: {
-          _id: '$conversation',
-          latestMessage: { $first: '$$ROOT' },
-        },
-      },
-      {
-        $lookup: {
-          from: 'users',
-          foreignField: '_id',
-          localField: 'latestMessage.sender',
-          as: 'user',
-        },
-      },
-      { $unwind: '$user' },
-    ]);
+    const latestMessages =
+      await MessageService.getLastMessageOfConversations(conversations);
 
     const notOurMessages = latestMessages
       .filter((messages) => messages.user.userId !== data.userId)
       .map((message) => message._id);
 
-    await this.messageService
-      .getRepository()
-      .updateMany(
-        { conversation: { $in: notOurMessages } },
-        { $set: { messageStatus: MessageStatus.DELIVERED } },
-      );
+    await MessageService.getRepository().updateMany(
+      { conversation: { $in: notOurMessages } },
+      { $set: { messageStatus: MessageStatus.DELIVERED } },
+    );
   }
 
   @SubscribeMessage('createConversation')
@@ -165,17 +111,26 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody(
       new ZodValidationPipe(
         createConversationSchema,
-        (error) => new WsException({
-          event: SocketEvents.ERROR,
-          data: { error: error.format() } as SocketPayloads[SocketEvents.ERROR]['data']
-        }),
+        (error) =>
+          new WsException({
+            event: SocketEvents.ERROR,
+            data: {
+              error: error.format(),
+            } as SocketPayloads[SocketEvents.ERROR]['data'],
+          }),
       ),
     )
     data: CreateConversationDto,
     @ConnectedSocket() client: Socket,
   ) {
+    const {
+      SocketStore,
+      UsersService,
+      ConversationParticipantService,
+      ConversationsService,
+    } = client.data.tenantServices;
 
-    const userId = this.socketStore.getUserFromSocket(client.id);
+    const userId = SocketStore.getUserFromSocket(client.id);
     if (!userId) {
       return {
         event: SocketEvents.ERROR,
@@ -191,17 +146,19 @@ export class ChatGateway implements OnGatewayDisconnect {
     if (allParticipants.length < 2)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid participants' } as SocketPayloads[SocketEvents.ERROR]['data'],
+        data: {
+          message: 'Invalid participants',
+        } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     //Check if participants exists
-    const userInfo = await this.userService.findWhere({
+    const userInfo = await UsersService.findWhere({
       userId: { $in: allParticipants },
     });
 
     const allUserInfo = [...userInfo];
     if (allParticipants.length !== userInfo.length) {
-      const addNewUsers = await this.userService.addNewUsers(
+      const addNewUsers = await UsersService.addNewUsers(
         allParticipants,
         userInfo,
       );
@@ -210,28 +167,28 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     //Validate If conversation of same participants exists
     const conversationParticipants =
-      await this.conversationPService.getPastConversation(allParticipants);
+      await ConversationParticipantService.getPastConversation(allParticipants);
     if (conversationParticipants.length > 0)
       return {
         event: SocketEvents.CONVERSATION_INFO,
         data: { conversationId: conversationParticipants[0].conversation },
       };
 
-    const conversation = await this.conversationService.save({});
+    const conversation = await ConversationsService.save({});
 
-    const conversationParticipant = await this.conversationPService.saveMany(
-      allUserInfo.map((participant) => ({
-        conversation: new Types.ObjectId(conversation.id),
-        user: participant._id,
-      })),
-    );
+    const conversationParticipant =
+      await ConversationParticipantService.saveMany(
+        allUserInfo.map((participant) => ({
+          conversation: new Types.ObjectId(conversation.id),
+          user: participant._id,
+        })),
+      );
 
     // Update in conversation with participants
-    await this.conversationService.update(conversation.id, {
+    await ConversationsService.update(conversation.id, {
       participants: conversationParticipant,
     });
 
-    // Send conversationId
     return {
       event: SocketEvents.CONVERSATION_INFO,
       data: { conversationId: conversation.id },
@@ -243,55 +200,71 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody(
       new ZodValidationPipe(
         sendMessageSchema,
-        (error) => new WsException({
-          event: SocketEvents.ERROR,
-          data: { error: error.format() } as SocketPayloads[SocketEvents.ERROR]['data']
-        }),
+        (error) =>
+          new WsException({
+            event: SocketEvents.ERROR,
+            data: {
+              error: error.format(),
+            } as SocketPayloads[SocketEvents.ERROR]['data'],
+          }),
       ),
     )
     data: SendMessageDto,
     @ConnectedSocket() client: Socket,
   ) {
+    const {
+      UsersService,
+      MessageService,
+      ConversationParticipantService,
+      SocketStore,
+      ConversationsService,
+      SocketService,
+    } = client.data.tenantServices;
+
     // Get userId from socket
-    const userId = this.socketStore.getUserFromSocket(client.id);
+    const userId = SocketStore.getUserFromSocket(client.id);
     if (!userId)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Initiate socket connection' } as SocketPayloads[SocketEvents.ERROR]['data'],
+        data: {
+          message: 'Initiate socket connection',
+        } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     const { conversationId, message } = data;
 
     // Check If conversationId exists
-    const conversation = await this.conversationService.find(conversationId);
+    const conversation = await ConversationsService.find(conversationId);
     if (!conversation)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data']
-        ,
+        data: {
+          message: 'Invalid conversation',
+        } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     // Get participants & Check If user is part of conversation
     const participants =
-      await this.conversationPService.getParticipantsUserDetails(
+      await ConversationParticipantService.getParticipantsUserDetails(
         conversationId,
       );
     if (!participants)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data']
+        data: {
+          message: 'Invalid conversation',
+        } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     // Code for making seen if user directly sends message without seen
-    const lastMessage = await this.messageService
-      .getRepository()
+    const lastMessage = await MessageService.getRepository()
       .findOne({ conversation: new Types.ObjectId(conversationId) })
       .sort({ createdAt: -1 })
       .lean();
 
     if (lastMessage && !lastMessage.seenBy.includes(userId)) {
       // for removing the previous seen status in the message after pushing a new message
-      await this.messageService.changeMessageStatus(conversationId, userId);
+      await MessageService.changeMessageStatus(conversationId, userId);
 
       const payload: SocketPayloads[SocketEvents.STATUS_UPDATE] = {
         conversationId: conversationId,
@@ -299,30 +272,30 @@ export class ChatGateway implements OnGatewayDisconnect {
         messageId: lastMessage?._id as string,
         messageStatus: MessageStatus.SEEN,
         seenBy: [...lastMessage?.seenBy, userId],
-      }
+      };
 
-      this.chatService.emitToFilteredSocket(
+      SocketService.emitToFilteredSocket(
         SocketEvents.STATUS_UPDATE,
         participants,
         userId,
-        payload
+        payload,
       );
     }
 
-    const user = await this.userService.findWhere({ userId });
-    const messageInfo = await this.messageService.save({
+    const user = await UsersService.findWhere({ userId });
+    const messageInfo = await MessageService.save({
       conversation: new Types.ObjectId(conversationId),
       content: message, // Crypt
       messageStatus: MessageStatus.SENT,
       sender: new Types.ObjectId(user[0].id),
       seenBy: [userId],
     });
-    await this.conversationService.update(conversationId, {
+    await ConversationsService.update(conversationId, {
       lastMessage: message,
     });
 
     // Seen & pull
-    await this.messageService.seenMessage(conversationId, userId);
+    await MessageService.seenMessage(conversationId, userId);
 
     // If the user is in online "notify" that user with message
 
@@ -336,19 +309,18 @@ export class ChatGateway implements OnGatewayDisconnect {
       participants: participants.map(
         (participant) => participant.userDetail[0].userId,
       ),
+    };
 
-    }
-
-    const emittedSockets = this.chatService.emitToFilteredSocket(
+    const emittedSockets = SocketService.emitToFilteredSocket(
       SocketEvents.MESSAGE,
       participants,
       userId,
-      payload
+      payload,
     );
 
     if (emittedSockets <= 0) return;
 
-    const changed = await this.messageService.getRepository().findByIdAndUpdate(
+    const changed = await MessageService.getRepository().findByIdAndUpdate(
       {
         _id: messageInfo._id,
       },
@@ -361,9 +333,12 @@ export class ChatGateway implements OnGatewayDisconnect {
       conversationId: conversationId,
       group: conversation.participants.length > 2 ? true : false,
       messageStatus: MessageStatus.DELIVERED,
-
-    }
-    this.chatService.emitToSocket(SocketEvents.STATUS_UPDATE, participants, payloadd);
+    };
+    SocketService.emitToSocket(
+      SocketEvents.STATUS_UPDATE,
+      participants,
+      payloadd,
+    );
   }
 
   @SubscribeMessage('seenMessage')
@@ -371,44 +346,61 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody() data: seenMessageDto,
     @ConnectedSocket() client: Socket,
   ) {
-    const userId = this.socketStore.getUserFromSocket(client.id);
+    const {
+      MessageService,
+      ConversationParticipantService,
+      SocketStore,
+      ConversationsService,
+      SocketService,
+    } = client.data.tenantServices;
+
+    const userId = SocketStore.getUserFromSocket(client.id);
     if (!userId)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Initiate socket connection' } as SocketPayloads[SocketEvents.ERROR]['data'],
+        data: {
+          message: 'Initiate socket connection',
+        } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     const { conversationId } = data;
 
     // Check If conversationId exists
-    const conversation = await this.conversationService.find(conversationId);
+    const conversation = await ConversationsService.find(conversationId);
     if (!conversation)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'No any conversation with such id found' } as SocketPayloads[SocketEvents.ERROR]['data'],
+        data: {
+          message: 'No any conversation with such id found',
+        } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     // Get participants of conversation
-    const participants = await this.conversationPService.getParticipantsExcludingSelf(conversationId, userId)
+    const participants =
+      await ConversationParticipantService.getParticipantsExcludingSelf(
+        conversationId,
+        userId,
+      );
 
     if (!participants)
       return {
         event: SocketEvents.ERROR,
-        data: { message: 'Invalid conversation' } as SocketPayloads[SocketEvents.ERROR]['data'],
+        data: {
+          message: 'Invalid conversation',
+        } as SocketPayloads[SocketEvents.ERROR]['data'],
       };
 
     // using the seen logic from the message service
-    const updatedMessage = await this.messageService.seenMessage(
+    const updatedMessage = await MessageService.seenMessage(
       conversation._id as string,
       userId,
     );
-    await this.messageService.changeMessageStatus(
+    await MessageService.changeMessageStatus(
       conversation._id as string,
       userId,
     );
 
-    const messages = await this.messageService
-      .getRepository()
+    const messages = await MessageService.getRepository()
       .find({ conversation: conversation._id })
       .sort({ createdAt: -1 })
       .lean();
@@ -419,10 +411,12 @@ export class ChatGateway implements OnGatewayDisconnect {
       group: conversation.participants.length > 2 ? true : false,
       messageStatus: MessageStatus.SEEN,
       seenBy: updatedMessage!.seenBy,
+    };
 
-    }
-
-    this.chatService.emitToSocket(SocketEvents.STATUS_UPDATE, participants, payload);
+    SocketService.emitToSocket(
+      SocketEvents.STATUS_UPDATE,
+      participants,
+      payload,
+    );
   }
-
 }

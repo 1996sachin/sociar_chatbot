@@ -128,14 +128,13 @@ export class MessageService extends BaseService<MessageDocument> {
         },
       },
       { $project: { conversation: 0 } },
-
-    ]
+    ];
 
     const totalCountResult = await this.getRepository()
       .aggregate([...basePipeline, { $count: 'total' }])
-      .exec()
-    const totalCount = totalCountResult[0]?.total || 0
-    const totalPages = Math.ceil(totalCount / limitNum)
+      .exec();
+    const totalCount = totalCountResult[0]?.total || 0;
+    const totalPages = Math.ceil(totalCount / limitNum);
 
     const newData = await this.getRepository()
       .aggregate([
@@ -186,8 +185,8 @@ export class MessageService extends BaseService<MessageDocument> {
         totalCount,
         totalPages,
         currentPage: pageNum,
-        perPage: limitNum
-      }
+        perPage: limitNum,
+      },
     };
   }
 
@@ -223,7 +222,6 @@ export class MessageService extends BaseService<MessageDocument> {
   }
 
   async changeMessageStatus(conversationId: string, userId: string) {
-
     const messages = await this.getRepository().aggregate([
       {
         $match: {
@@ -278,20 +276,49 @@ export class MessageService extends BaseService<MessageDocument> {
     const lastMessage = await this.getRepository().aggregate([
       {
         $match: {
-          conversation: new Types.ObjectId(conversationId)
-        }
+          conversation: new Types.ObjectId(conversationId),
+        },
       },
       {
         $sort: {
-          createdAt: -1
-        }
+          createdAt: -1,
+        },
       },
       {
-        $limit: 1
-      }
-    ])
+        $limit: 1,
+      },
+    ]);
 
-    return lastMessage
-
+    return lastMessage;
+  }
+  async getLastMessageOfConversations(conversationIds: string[]) {
+    const latestMessages = await this.getRepository().aggregate([
+      {
+        $match: {
+          conversation: {
+            $in: conversationIds,
+          },
+        },
+      },
+      {
+        $sort: { createdAt: -1 },
+      },
+      {
+        $group: {
+          _id: '$conversation',
+          latestMessage: { $first: '$$ROOT' },
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          foreignField: '_id',
+          localField: 'latestMessage.sender',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+    ]);
+    return latestMessages;
   }
 }
