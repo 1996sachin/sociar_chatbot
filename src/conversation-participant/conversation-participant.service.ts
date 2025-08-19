@@ -92,4 +92,35 @@ export class ConversationParticipantService extends BaseService<ConversationPart
     ]);
     return conversationParticipants;
   }
+
+  async conversationsOfUser(userId: string) {
+    const conversationInfos = await this.getRepository().aggregate([
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'userDetails',
+        },
+      },
+      { $unwind: '$userDetails' },
+      {
+        $group: {
+          _id: '$conversation',
+          userDetails: { $push: '$userDetails' },
+          userIds: { $addToSet: '$userDetails.userId' },
+        },
+      },
+      { $match: { userIds: userId } },
+      {
+        $project: {
+          _id: 0,
+          conversation: '$_id',
+          userDetails: 1,
+          userIds: 1,
+        },
+      },
+    ]);
+    return conversationInfos;
+  }
 }

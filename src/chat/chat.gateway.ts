@@ -88,64 +88,13 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     // deliver msg after init
     const conversationInfos =
-      await ConversationParticipantService.getRepository().aggregate([
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'user',
-            foreignField: '_id',
-            as: 'userDetails',
-          },
-        },
-        { $unwind: '$userDetails' },
-        {
-          $group: {
-            _id: '$conversation',
-            userDetails: { $push: '$userDetails' },
-            userIds: { $addToSet: '$userDetails.userId' },
-          },
-        },
-        { $match: { userIds: data.userId } },
-        {
-          $project: {
-            _id: 0,
-            conversation: '$_id',
-            userDetails: 1,
-            userIds: 1,
-          },
-        },
-      ]);
+      await ConversationParticipantService.conversationsOfUser(data.userId);
     const conversations = conversationInfos.map(
       (conversationInfo) => conversationInfo.conversation,
     );
 
-    const latestMessages = await MessageService.getRepository().aggregate([
-      {
-        $match: {
-          conversation: {
-            $in: conversations,
-          },
-        },
-      },
-      {
-        $sort: { createdAt: -1 },
-      },
-      {
-        $group: {
-          _id: '$conversation',
-          latestMessage: { $first: '$$ROOT' },
-        },
-      },
-      {
-        $lookup: {
-          from: 'users',
-          foreignField: '_id',
-          localField: 'latestMessage.sender',
-          as: 'user',
-        },
-      },
-      { $unwind: '$user' },
-    ]);
+    const latestMessages =
+      await MessageService.getLastMessageOfConversations(conversations);
 
     const notOurMessages = latestMessages
       .filter((messages) => messages.user.userId !== data.userId)
