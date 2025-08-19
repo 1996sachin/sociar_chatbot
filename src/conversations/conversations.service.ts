@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  forwardRef,
   Inject,
   Injectable,
   NotFoundException,
@@ -25,7 +26,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
     private readonly UserService: UsersService,
     @Inject()
     private readonly conversationPService: ConversationParticipantService,
-    @Inject()
+    @Inject(forwardRef(() => MessageService))
     private readonly messageService: MessageService,
   ) {
     super(ConversationModel);
@@ -214,8 +215,8 @@ export class ConversationsService extends BaseService<ChatDocument> {
       content: `{${userId}} renamed conversation to {${name}}`,
       messageStatus: MessageStatus.DELIVERED,
       seenBy: [userId],
-      messageType: MessageTypes.LOG
-    })
+      messageType: MessageTypes.LOG,
+    });
 
     return {
       message: 'Converastion renamed successfully',
@@ -351,7 +352,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
       seenBy: [userId],
       messageType: MessageTypes.LOG,
     });
-
 
     return {
       message: 'Participant removed successfully.',
