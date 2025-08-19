@@ -7,6 +7,7 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Types } from 'mongoose';
@@ -62,14 +63,7 @@ export class ConversationsGateway {
 
     const currentUser = SocketStore.getUserFromSocket(client.id);
 
-    if (!currentUser) {
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Initiate socket connection',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
-    }
+    if (!currentUser) throw new WsException('Initiate socket connection');
 
     const { participantIds, conversationId } = data;
 
@@ -89,12 +83,7 @@ export class ConversationsGateway {
     const conversation =
       await ConversationsService.getRepository().findById(conversationId);
     if (!conversation)
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'No any conversation with such id found',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
+      throw new WsException('No any conversation with such id found');
 
     // finding mongoose userId of the user
 
@@ -115,14 +104,8 @@ export class ConversationsGateway {
         participantIds,
       );
 
-    if (!participants || participants.length === 0) {
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Invalid conversation',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
-    }
+    if (!participants || participants.length === 0)
+      throw new WsException('Invalid conversation');
 
     // if group adding the new participant
     if (conversation.conversationType === 'group') {
@@ -235,14 +218,7 @@ export class ConversationsGateway {
     } = client.data.tenantServices;
 
     const currentUser = SocketStore.getUserFromSocket(client.id);
-    if (!currentUser) {
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Initiate socket connection',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
-    }
+    if (!currentUser) throw new WsException('Initiate socket connection');
 
     const { conversationId } = data;
 
@@ -251,14 +227,7 @@ export class ConversationsGateway {
         conversationId,
       );
 
-    if (!participants) {
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Invalid conversation',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
-    }
+    if (!participants) throw new WsException('Invalid conversation');
 
     // using the service to leave the conversation
     await ConversationsService.leaveConversation(conversationId, currentUser);
@@ -303,24 +272,13 @@ export class ConversationsGateway {
     const { participantId, conversationId } = data;
 
     const currentUser = SocketStore.getUserFromSocket(client.id);
-    if (!currentUser) {
-      return {
-        event: SocketEvents.ERROR,
-        data: { message: 'Initiate socket connection' },
-      };
-    }
+    if (!currentUser) throw new WsException('Initiate socket connection');
 
     const participants =
       await ConversationParticipantService.getParticipantsUserDetails(
         conversationId,
       );
-    if (!participants)
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Invalid conversation',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
+    if (!participants) throw new WsException('Invalid conversation');
 
     await ConversationsService.removeParticipant(
       conversationId,
@@ -367,28 +325,14 @@ export class ConversationsGateway {
     const { name, conversationId } = data;
 
     const currentUser = SocketStore.getUserFromSocket(client.id);
-    if (!currentUser) {
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Initiate socket connection',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
-    }
+    if (!currentUser) throw new WsException('Initiate socket connection');
 
     const participants =
       await ConversationParticipantService.getParticipantsUserDetails(
         conversationId,
       );
 
-    if (!participants) {
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Invalid conversation',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
-    }
+    if (!participants) throw new WsException('Invalid conversation');
 
     await ConversationsService.renameConversation(
       conversationId,

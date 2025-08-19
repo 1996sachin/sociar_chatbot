@@ -131,12 +131,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     } = client.data.tenantServices;
 
     const userId = SocketStore.getUserFromSocket(client.id);
-    if (!userId) {
-      return {
-        event: SocketEvents.ERROR,
-        data: { message: 'Initiate socket connection' },
-      };
-    }
+    if (!userId) throw new WsException('Initiate socket connection');
 
     const { participants } = data;
     const allParticipants = [
@@ -144,12 +139,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       ...(participants.includes(userId) ? [] : [userId]),
     ];
     if (allParticipants.length < 2)
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Invalid participants',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
+      throw new WsException('Invalid participants');
 
     //Check if participants exists
     const userInfo = await UsersService.findWhere({
@@ -223,38 +213,20 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     // Get userId from socket
     const userId = SocketStore.getUserFromSocket(client.id);
-    if (!userId)
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Initiate socket connection',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
+    if (!userId) throw new WsException('Initiate socket connection');
 
     const { conversationId, message } = data;
 
     // Check If conversationId exists
     const conversation = await ConversationsService.find(conversationId);
-    if (!conversation)
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Invalid conversation',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
+    if (!conversation) throw new WsException('Invalid conversation');
 
     // Get participants & Check If user is part of conversation
     const participants =
       await ConversationParticipantService.getParticipantsUserDetails(
         conversationId,
       );
-    if (!participants)
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Invalid conversation',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
+    if (!participants) throw new WsException('Invalid conversation');
 
     // Code for making seen if user directly sends message without seen
     const lastMessage = await MessageService.getRepository()
@@ -355,25 +327,14 @@ export class ChatGateway implements OnGatewayDisconnect {
     } = client.data.tenantServices;
 
     const userId = SocketStore.getUserFromSocket(client.id);
-    if (!userId)
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Initiate socket connection',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
+    if (!userId) throw new WsException('Initiate socket connection');
 
     const { conversationId } = data;
 
     // Check If conversationId exists
     const conversation = await ConversationsService.find(conversationId);
     if (!conversation)
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'No any conversation with such id found',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
+      throw new WsException('No any conversation with such id found');
 
     // Get participants of conversation
     const participants =
@@ -382,13 +343,7 @@ export class ChatGateway implements OnGatewayDisconnect {
         userId,
       );
 
-    if (!participants)
-      return {
-        event: SocketEvents.ERROR,
-        data: {
-          message: 'Invalid conversation',
-        } as SocketPayloads[SocketEvents.ERROR]['data'],
-      };
+    if (!participants) throw new WsException('Invalid conversation');
 
     // using the seen logic from the message service
     const updatedMessage = await MessageService.seenMessage(

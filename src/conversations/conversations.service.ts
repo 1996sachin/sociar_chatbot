@@ -36,7 +36,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
     const offset = (pageNumber - 1) * limitNum;
-    await new Promise((resolve) => process.nextTick(resolve)); // <- add this
+    await new Promise((resolve) => process.nextTick(resolve)); // DO NOT REMOVE THIS
     const userExists = await this.UserService.findWhere({
       userId: user,
     });
