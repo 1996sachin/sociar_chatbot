@@ -11,7 +11,7 @@ const tenantProviders = [
     scope: Scope.REQUEST,
     inject: [REQUEST, getConnectionToken()],
     useFactory: async (req: Request, connection: Connection) => {
-      const tenantId = req['tenantId'];
+      const tenantId = req['tenantId'] ?? 'chat_default';
       const dbName = `tenant_${tenantId}`;
       // if (
       //   !(await connection.listDatabases()).databases

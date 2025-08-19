@@ -18,7 +18,8 @@ export class TenantDatabaseInterceptor implements NestInterceptor {
   ): Promise<Observable<any>> {
     const wsCtx = context.switchToWs();
     const client = wsCtx.getClient<Socket>();
-    const tenantId = client.handshake.headers['x-tenant-id'] as string;
+    const tenantId =
+      (client.handshake.headers['x-tenant-id'] as string) ?? 'chat_default';
 
     const services =
       await this.tenantServiceFactory.getServicesForTenant(tenantId);
