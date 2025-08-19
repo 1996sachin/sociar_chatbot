@@ -36,6 +36,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
     const offset = (pageNumber - 1) * limitNum;
+    await new Promise((resolve) => process.nextTick(resolve)); // <- add this
     const userExists = await this.UserService.findWhere({
       userId: user,
     });
@@ -185,6 +186,8 @@ export class ConversationsService extends BaseService<ChatDocument> {
     userId: string,
     name: string,
   ) {
+    await new Promise((resolve) => process.nextTick(resolve)); // <- add this
+
     const conversation = await this.find(conversationId);
 
     if (!conversation) {
@@ -224,6 +227,8 @@ export class ConversationsService extends BaseService<ChatDocument> {
   }
 
   async leaveConversation(conversationId: string, userId: string) {
+    await new Promise((resolve) => process.nextTick(resolve)); // <- add this
+
     const mongooseUserId = await this.UserService.getRepository().findOne({
       userId: userId,
     });
@@ -287,6 +292,8 @@ export class ConversationsService extends BaseService<ChatDocument> {
     userId: string,
     participantId: string,
   ) {
+    await new Promise((resolve) => process.nextTick(resolve)); // <- add this
+
     const conversation = await this.getRepository().findOne({
       _id: conversationId,
     });
