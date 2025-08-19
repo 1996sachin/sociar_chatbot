@@ -142,10 +142,6 @@ export class ConversationsGateway {
           messageStatus: MessageStatus.DELIVERED,
         });
 
-        await this.conversationService.updateWhere(
-          { _id: new Types.ObjectId(conversationId) },
-          { lastMessage: logMsg.content },
-        );
       }
     }
     else {

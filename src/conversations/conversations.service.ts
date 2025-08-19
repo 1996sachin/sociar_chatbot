@@ -206,18 +206,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
       messageType: MessageTypes.LOG
     })
 
-    await this.getRepository().findByIdAndUpdate({
-      _id: conversation._id,
-    },
-      {
-        $set: {
-          name: name,
-          lastMessage: renameLog.content
-        }
-      },
-      { new: true }
-    )
-
     return {
       message: 'Converastion renamed successfully',
     }
@@ -277,16 +265,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
         seenBy: [userId]
         ,
       });
-
-      // this if for latest msg of the conversation regarding the user left
-      await this.updateWhere(
-        {
-          _id: conversation._id
-        },
-        {
-          lastMessage: leaveLog.content
-        }
-      )
 
       return {
         message: "Conversation left successfully."
@@ -353,15 +331,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
       messageType: MessageTypes.LOG,
     })
 
-    // this if for latest msg of the conversation regarding the user removed 
-    await this.updateWhere(
-      {
-        _id: conversation._id
-      },
-      {
-        lastMessage: leaveLog.content
-      }
-    )
 
     return {
       message: "Participant removed successfully."
