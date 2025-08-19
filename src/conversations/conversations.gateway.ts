@@ -71,7 +71,7 @@ export class ConversationsGateway {
       };
     }
 
-    const { participantId, conversationId } = data;
+    const { participantIds, conversationId } = data;
 
     const currentUserDetails = await UsersService.getRepository().findOne({
       userId: currentUser,
@@ -97,23 +97,22 @@ export class ConversationsGateway {
       };
 
     // finding mongoose userId of the user
-    const participantDetails = await UsersService.getRepository().findOne({
-      userId: participantId,
-    });
 
-    if (!participantDetails) {
-      return {
-        event: SocketEvents.WARNING,
-        message:
-          'no such user found' as SocketPayloads[SocketEvents.MESSAGE]['message'],
-      };
-    }
+    const allParticipants = [...participantIds];
+
+    const partDetails = await Promise.all(
+      allParticipants.map((x) => {
+        return UsersService.getRepository().findOne({
+          userId: x,
+        });
+      }),
+    );
 
     // Get participants of conversation
     const participants =
       await ConversationParticipantService.getParticipantsExcludingSelf(
         conversationId,
-        participantId,
+        participantIds,
       );
 
     if (!participants || participants.length === 0) {
@@ -127,48 +126,35 @@ export class ConversationsGateway {
 
     // if group adding the new participant
     if (conversation.conversationType === 'group') {
-      const participantPartOfConv =
-        await ConversationParticipantService.findWhere({
+      for (const participantDetails of partDetails) {
+        if (!participantDetails) continue; // skip invalid user
+
+        const participantPartOfConv =
+          await ConversationParticipantService.findWhere({
+            conversation: new Types.ObjectId(conversationId),
+            user: participantDetails._id,
+          });
+
+        if (participantPartOfConv.length !== 0) continue; // skip if already part
+
+        const newParticipant = await ConversationParticipantService.save({
           conversation: new Types.ObjectId(conversationId),
           user: participantDetails._id,
         });
 
-      if (participantPartOfConv.length !== 0) {
-        return {
-          event: SocketEvents.WARNING,
-          message:
-            'participant is already part of this conversation' as SocketPayloads[SocketEvents.WARNING]['message'],
-        };
+        await ConversationsService.getRepository().updateOne(
+          { _id: conversationId },
+          { $addToSet: { participants: newParticipant._id } },
+        );
+
+        const logMsg = await MessageService.save({
+          conversation: new Types.ObjectId(conversationId),
+          sender: currentUserDetails._id,
+          content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
+          messageType: MessageTypes.LOG,
+          messageStatus: MessageStatus.DELIVERED,
+        });
       }
-
-      const newParticipant = await ConversationParticipantService.save({
-        conversation: new Types.ObjectId(conversationId),
-        user: participantDetails._id,
-      });
-
-      await ConversationsService.getRepository().updateOne(
-        { _id: conversationId },
-        {
-          $addToSet: { participants: newParticipant._id },
-        },
-      );
-
-      const logMsg = await MessageService.save({
-        conversation: new Types.ObjectId(conversationId),
-        sender: currentUserDetails._id,
-        content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
-        messageType: MessageTypes.LOG,
-        messageStatus: MessageStatus.DELIVERED,
-      });
-
-      await ConversationsService.updateWhere(
-        {
-          _id: new Types.ObjectId(conversationId),
-        },
-        {
-          lastMessage: logMsg.content,
-        },
-      );
     } else {
       // creating a new conversation if personal msg
       const newConversation = await ConversationsService.getRepository().create(
@@ -186,18 +172,26 @@ export class ConversationsGateway {
         };
       }
 
+      // map old participants
       const oldParticipants = participants.map((p) => ({
         _id: new Types.ObjectId(),
         conversation: new Types.ObjectId(String(newConversation._id)),
         user: p.user,
       }));
 
-      if (!oldParticipants.some((p) => p.user.equals(participantDetails._id))) {
-        oldParticipants.push({
-          _id: new Types.ObjectId(),
-          conversation: new Types.ObjectId(String(newConversation._id)),
-          user: new Types.ObjectId(String(participantDetails._id)),
-        });
+      // loop through all valid participants and add if not already included
+      for (const participantDetails of partDetails) {
+        if (!participantDetails) continue; // skip invalid users
+
+        if (
+          !oldParticipants.some((p) => p.user.equals(participantDetails._id))
+        ) {
+          oldParticipants.push({
+            _id: new Types.ObjectId(),
+            conversation: new Types.ObjectId(String(newConversation._id)),
+            user: new Types.ObjectId(String(participantDetails._id)),
+          });
+        }
       }
 
       await ConversationParticipantService.getRepository().insertMany(
@@ -205,21 +199,22 @@ export class ConversationsGateway {
       );
 
       await ConversationsService.getRepository().updateOne(
-        {
-          _id: newConversation._id,
-        },
-        {
-          $set: { participants: oldParticipants.map((x) => x._id) },
-        },
+        { _id: newConversation._id },
+        { $set: { participants: oldParticipants.map((x) => x._id) } },
       );
 
-      await MessageService.save({
-        conversation: new Types.ObjectId(String(newConversation._id)),
-        sender: currentUserDetails._id,
-        content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
-        messageType: MessageTypes.LOG,
-        messageStatus: MessageStatus.DELIVERED,
-      });
+      // save logs for each participant added
+      for (const participantDetails of partDetails) {
+        if (!participantDetails) continue;
+
+        await MessageService.save({
+          conversation: new Types.ObjectId(String(newConversation._id)),
+          sender: currentUserDetails._id,
+          content: `{${currentUser}} added {${participantDetails.userId}} to the conversation`,
+          messageType: MessageTypes.LOG,
+          messageStatus: MessageStatus.DELIVERED,
+        });
+      }
     }
   }
 

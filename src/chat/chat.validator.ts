@@ -42,11 +42,7 @@ export const addParticipantsSchema = (
   ConversationModel: Model<ChatDocument>,
 ) =>
   z.object({
-    participantId: notFoundCheck({
-      model: UserModel,
-      field: '_id',
-      message: 'No user with such user id found',
-    }),
+    participantIds: z.array(z.string()),
     conversationId: notFoundCheck({
       model: ConversationModel,
       field: '_id',
