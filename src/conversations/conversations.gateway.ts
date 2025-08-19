@@ -236,6 +236,7 @@ export class ConversationsGateway {
       ConversationParticipantService,
       SocketStore,
       ConversationsService,
+      SocketService,
     } = client.data.tenantServices;
 
     const currentUser = SocketStore.getUserFromSocket(client.id);
@@ -279,7 +280,7 @@ export class ConversationsGateway {
       messageType: lastMessage[0].messageType,
     };
 
-    SocketStore.emitToFilteredSocket(
+    SocketService.emitToFilteredSocket(
       SocketEvents.LOG_MESSAGE,
       participants,
       currentUser as string,
@@ -301,6 +302,7 @@ export class ConversationsGateway {
       ConversationParticipantService,
       SocketStore,
       ConversationsService,
+      SocketService,
     } = client.data.tenantServices;
 
     const { participantId, conversationId } = data;
@@ -343,7 +345,7 @@ export class ConversationsGateway {
       messageType: lastMessage[0].messageType,
     };
 
-    SocketStore.emitToFilteredSocket(
+    SocketService.emitToFilteredSocket(
       SocketEvents.LOG_MESSAGE,
       participants,
       currentUser as string,
@@ -364,6 +366,7 @@ export class ConversationsGateway {
       ConversationParticipantService,
       SocketStore,
       ConversationsService,
+      SocketService,
     } = client.data.tenantServices;
 
     const { name, conversationId } = data;
@@ -410,7 +413,7 @@ export class ConversationsGateway {
       messageType: lastMessage[0].messageType,
     };
 
-    SocketStore.emitToFilteredSocket(
+    SocketService.emitToFilteredSocket(
       SocketEvents.LOG_MESSAGE,
       participants,
       currentUser as string,

@@ -269,6 +269,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       ConversationParticipantService,
       SocketStore,
       ConversationsService,
+      SocketService,
     } = client.data.tenantServices;
 
     // Get userId from socket
@@ -324,7 +325,7 @@ export class ChatGateway implements OnGatewayDisconnect {
         seenBy: [...lastMessage?.seenBy, userId],
       };
 
-      SocketStore.emitToFilteredSocket(
+      SocketService.emitToFilteredSocket(
         SocketEvents.STATUS_UPDATE,
         participants,
         userId,
@@ -361,8 +362,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       ),
     };
 
-    console.log('SocketStore', SocketStore);
-    const emittedSockets = SocketStore.emitToFilteredSocket(
+    const emittedSockets = SocketService.emitToFilteredSocket(
       SocketEvents.MESSAGE,
       participants,
       userId,
@@ -385,7 +385,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       group: conversation.participants.length > 2 ? true : false,
       messageStatus: MessageStatus.DELIVERED,
     };
-    SocketStore.emitToSocket(
+    SocketService.emitToSocket(
       SocketEvents.STATUS_UPDATE,
       participants,
       payloadd,
@@ -402,6 +402,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       ConversationParticipantService,
       SocketStore,
       ConversationsService,
+      SocketService,
     } = client.data.tenantServices;
 
     const userId = SocketStore.getUserFromSocket(client.id);
@@ -463,6 +464,10 @@ export class ChatGateway implements OnGatewayDisconnect {
       seenBy: updatedMessage!.seenBy,
     };
 
-    SocketStore.emitToSocket(SocketEvents.STATUS_UPDATE, participants, payload);
+    SocketService.emitToSocket(
+      SocketEvents.STATUS_UPDATE,
+      participants,
+      payload,
+    );
   }
 }

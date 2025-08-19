@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ContextIdFactory, ModuleRef } from '@nestjs/core';
-import { ChatService } from 'src/chat/chat.service';
+import { SocketService } from 'src/common/socket/socket.service';
 import { SocketStore } from 'src/common/socket/socket.store';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { ConversationsService } from 'src/conversations/conversations.service';
@@ -39,6 +39,7 @@ export class TenantServiceFactory {
     );
 
     const tenantSocketStore = new SocketStore();
+    services[SocketService.name] = new SocketService(tenantSocketStore);
     services[SocketStore.name] = tenantSocketStore;
 
     this.serviceCache.set(tenantId, services);
