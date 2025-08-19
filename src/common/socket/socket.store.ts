@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { getByValue } from 'src/common/utils/map.utils';
 import { Socket } from 'socket.io';
+import { getByValue } from 'src/common/utils/map.utils';
+
+interface UserDetail {
+  userId: string;
+}
+interface Participant {
+  userDetail: UserDetail[];
+}
 
 @Injectable()
 export class SocketStore {
@@ -16,6 +23,10 @@ export class SocketStore {
     const getSocket = this.userSocketStore.get(userId);
     if (getSocket) return this.get(getSocket);
     return;
+  }
+
+  has(socketId) {
+    return this.store.has(socketId);
   }
 
   get(socketId: string): Socket | undefined {

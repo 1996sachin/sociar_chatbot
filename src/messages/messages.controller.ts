@@ -46,15 +46,16 @@ export class MessagesController {
       this.userService.getRepository(),
     ).parseAsync(body);
 
-    const createdMessage = await this.messagesService.createMessage({
-      senderId: data.senderId,
-      content: data.content,
-      recieverId: data.recieverId,
-      conversationId: data.conversation,
-    });
+    // const createdMessage = await this.messagesService.createMessage({
+    //   senderId: data.senderId,
+    //   content: data.content,
+    //   recieverId: data.recieverId,
+    //   conversationId: data.conversation,
+    // });
     return {
       message: 'Message created successfully',
-      data: createdMessage,
+      // data: createdMessage,
+      data: '',
     };
   }
 
