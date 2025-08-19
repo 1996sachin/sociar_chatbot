@@ -152,6 +152,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
         {
           $project: {
             userId: '$participants.userId',
+            name: 1,
             lastMessage: -1,
             updatedAt: -1,
             unreadCount: 1,
