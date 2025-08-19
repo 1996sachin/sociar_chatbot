@@ -65,7 +65,7 @@ export class ConversationsGateway {
       };
     }
 
-    const { participantId, conversationId } = data;
+    const { participantIds, conversationId } = data;
 
     const currentUserDetails = await this.userService.getRepository().findOne({
       userId: currentUser,
@@ -91,7 +91,7 @@ export class ConversationsGateway {
     // finding mongoose userId of the user
 
     const allParticipants = [
-      ...participantId,
+      ...participantIds,
     ]
 
     const partDetails = await Promise.all(
@@ -103,7 +103,7 @@ export class ConversationsGateway {
     )
 
     // Get participants of conversation
-    const participants = await this.conversationPService.getParticipantsExcludingSelf(conversationId, participantId)
+    const participants = await this.conversationPService.getParticipantsExcludingSelf(conversationId, participantIds)
 
     if (!participants || participants.length === 0) {
       return {
@@ -352,5 +352,4 @@ export class ConversationsGateway {
     this.chatService.emitToFilteredSocket(SocketEvents.LOG_MESSAGE, participants, currentUser as string, payload)
 
   }
-  conversationgat
 }
