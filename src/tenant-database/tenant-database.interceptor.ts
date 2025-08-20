@@ -19,7 +19,8 @@ export class TenantDatabaseInterceptor implements NestInterceptor {
     const wsCtx = context.switchToWs();
     const client = wsCtx.getClient<Socket>();
     const tenantId =
-      (client.handshake.headers['x-tenant-id'] as string) ?? 'chat_default';
+      (client.handshake.headers['x-tenant-id'] as string) ??
+      process.env.DEFAULT_DB;
 
     const services =
       await this.tenantServiceFactory.getServicesForTenant(tenantId);
