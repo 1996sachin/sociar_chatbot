@@ -415,11 +415,6 @@ export class ConversationsGateway {
       messageType: lastMessage[0].messageType,
     };
 
-    SocketService.emitToSocket(
-      SocketEvents.LOG_MESSAGE,
-      participants,
-      currentUser as string,
-      payload,
-    );
+    SocketService.emitToSocket(SocketEvents.LOG_MESSAGE, participants, payload);
   }
 }
