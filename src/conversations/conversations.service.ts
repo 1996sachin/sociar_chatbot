@@ -74,6 +74,15 @@ export class ConversationsService extends BaseService<ChatDocument> {
       { $unwind: '$participantDetails.userInfo' },
       {
         $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy',
+        },
+      },
+      { $unwind: '$createdBy' },
+      {
+        $lookup: {
           from: 'messages',
           localField: '_id',
           foreignField: 'conversation',
@@ -167,6 +176,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
             lastMessage: -1,
             updatedAt: -1,
             unreadCount: 1,
+            createdBy: '$createdBy.userId',
           },
         },
         { $sort: { updatedAt: -1 } },

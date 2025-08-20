@@ -143,15 +143,15 @@ export class ChatGateway implements OnGatewayDisconnect {
       throw new WsException('Invalid participants');
 
     //Check if participants exists
-    const userInfo = await UsersService.findWhere({
+    const usersInfo = await UsersService.findWhere({
       userId: { $in: allParticipants },
     });
 
-    const allUserInfo = [...userInfo];
-    if (allParticipants.length !== userInfo.length) {
+    const allUserInfo = [...usersInfo];
+    if (allParticipants.length !== usersInfo.length) {
       const addNewUsers = await UsersService.addNewUsers(
         allParticipants,
-        userInfo,
+        usersInfo,
       );
       allUserInfo.push(...(addNewUsers as any[]));
     }
@@ -165,7 +165,9 @@ export class ChatGateway implements OnGatewayDisconnect {
         data: { conversationId: conversationParticipants[0].conversation },
       };
 
+    const userInfo = await UsersService.findWhere({ userId });
     const conversation = await ConversationsService.save({
+      createdBy: userInfo[0]._id,
       conversationType:
         allParticipants.length > 2
           ? ConversationType.GROUP

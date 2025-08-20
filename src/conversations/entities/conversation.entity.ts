@@ -23,7 +23,7 @@ export class Conversation {
   @Prop()
   name: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: false })
+  @Prop({ type: Types.ObjectId, ref: 'User' })
   createdBy: Types.ObjectId;
 
   @Prop({ default: ConversationType.PRIVATE })
