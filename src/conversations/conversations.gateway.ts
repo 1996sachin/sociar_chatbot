@@ -144,6 +144,7 @@ export class ConversationsGateway {
       messageStatus: MessageStatus.SEEN,
       userId: currentUser,
       messageType: MessageTypes.LOG,
+      createdAt: logMsg.createdAt,
     };
 
     const participantToEmit =
@@ -312,6 +313,7 @@ export class ConversationsGateway {
       messageStatus: MessageStatus.SEEN,
       userId: currentUser,
       messageType: lastMessage[0].messageType,
+      createdAt: lastMessage[0].createdAt,
     };
 
     SocketService.emitToFilteredSocket(
@@ -366,6 +368,7 @@ export class ConversationsGateway {
       messageStatus: MessageStatus.SEEN,
       userId: currentUser,
       messageType: lastMessage[0].messageType,
+      createdAt: lastMessage[0].createdAt,
     };
 
     SocketService.emitToSocket(SocketEvents.LOG_MESSAGE, participants, payload);
@@ -416,6 +419,7 @@ export class ConversationsGateway {
       userId: currentUser,
       messageType: lastMessage[0].messageType,
       name,
+      createdAt: lastMessage[0].createdAt,
     };
 
     SocketService.emitToSocket(SocketEvents.LOG_MESSAGE, participants, payload);
