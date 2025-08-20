@@ -59,37 +59,103 @@ export class ConversationsGateway {
       SocketStore,
       ConversationsService,
       UsersService,
+      SocketService,
     } = client.data.tenantServices;
 
     const currentUser = SocketStore.getUserFromSocket(client.id);
-
     if (!currentUser) throw new WsException('Initiate socket connection');
 
-    const { participantIds, conversationId } = data;
+    const { participants, conversationId } = data;
 
     const currentUserDetails = await UsersService.getRepository().findOne({
       userId: currentUser,
     });
-
-    if (!currentUserDetails) {
-      return {
-        event: SocketEvents.WARNING,
-        message:
-          'No such user found' as SocketPayloads[SocketEvents.WARNING]['message'],
-      };
-    }
+    if (!currentUserDetails) throw new WsException('No such user found');
 
     // Check If conversationId exists
     const conversation =
       await ConversationsService.getRepository().findById(conversationId);
     if (!conversation)
       throw new WsException('No any conversation with such id found');
+    if (conversation.conversationType !== 'group')
+      throw new WsException('Cannot add participants in private conversation');
 
     // finding mongoose userId of the user
+    const allParticipants = [...participants];
 
-    const allParticipants = [...participantIds];
+    const currentParticipants = await ConversationParticipantService.findWhere({
+      conversation: conversation._id,
+      user: currentUserDetails._id,
+    });
+    if (currentParticipants.length <= 0)
+      throw new WsException('Invalid conversation');
 
-    const partDetails = await Promise.all(
+    const usersInfo = await UsersService.findWhere({
+      userId: { $in: allParticipants },
+    });
+    const participantsInfo = await ConversationParticipantService.findWhere({
+      conversation: conversation._id,
+    });
+
+    const newParticipantsUserInfo = usersInfo.filter((userInfo) =>
+      participantsInfo.every(
+        (participantInfo) =>
+          participantInfo.user.toString() !== userInfo._id.toString(),
+      ),
+    );
+
+    const newUserInfo: any[] = [];
+    if (allParticipants.length !== usersInfo.length) {
+      const addNewUsers = await UsersService.addNewUsers(
+        allParticipants,
+        usersInfo,
+      );
+      newUserInfo.push(...(addNewUsers as any[]));
+    }
+
+    const allNewParticipants = [...newUserInfo, ...newParticipantsUserInfo];
+    if (allNewParticipants.length <= 0) return;
+
+    const conversationParticipant =
+      await ConversationParticipantService.saveMany(
+        allNewParticipants.map((participant) => ({
+          conversation: conversation._id,
+          user: participant._id,
+        })),
+      );
+    await ConversationsService.update(conversation.id, {
+      participants: conversationParticipant,
+    });
+    const logMsg = await MessageService.save({
+      conversation: new Types.ObjectId(conversationId),
+      sender: currentUserDetails._id,
+      content: `{${currentUser}} added {${allNewParticipants.map((newParticipants) => newParticipants.userId)}} to the conversation`,
+      messageType: MessageTypes.LOG,
+      messageStatus: MessageStatus.DELIVERED,
+    });
+
+    const payload: SocketPayloads[SocketEvents.LOG_MESSAGE] = {
+      conversationId: conversationId,
+      group: participants.length > 2 ? true : false,
+      messageId: logMsg._id,
+      message: logMsg.content,
+      messageStatus: MessageStatus.SEEN,
+      userId: currentUser,
+      messageType: MessageTypes.LOG,
+    };
+
+    const participantToEmit =
+      await ConversationParticipantService.getParticipantsUserDetails(
+        conversationId,
+      );
+    if (participants.length <= 0) throw new WsException('Invalid conversation');
+    SocketService.emitToSocket(
+      SocketEvents.LOG_MESSAGE,
+      participantToEmit,
+      payload,
+    );
+
+    /* const partDetails = await Promise.all(
       allParticipants.map((x) => {
         return UsersService.getRepository().findOne({
           userId: x,
@@ -107,9 +173,11 @@ export class ConversationsGateway {
     if (!participants || participants.length === 0)
       throw new WsException('Invalid conversation');
 
+    console.log('conversation.conversationType', conversation.conversationType);
     // if group adding the new participant
     if (conversation.conversationType === 'group') {
       for (const participantDetails of partDetails) {
+        console.log('participantDetails', participantDetails);
         if (!participantDetails) continue; // skip invalid user
 
         const participantPartOfConv =
@@ -198,7 +266,7 @@ export class ConversationsGateway {
           messageStatus: MessageStatus.DELIVERED,
         });
       }
-    }
+    } */
   }
 
   @SubscribeMessage('leaveConversation')
@@ -298,12 +366,7 @@ export class ConversationsGateway {
       messageType: lastMessage[0].messageType,
     };
 
-    SocketService.emitToFilteredSocket(
-      SocketEvents.LOG_MESSAGE,
-      participants,
-      currentUser as string,
-      payload,
-    );
+    SocketService.emitToSocket(SocketEvents.LOG_MESSAGE, participants, payload);
   }
 
   @SubscribeMessage('renameConversation')
@@ -352,7 +415,7 @@ export class ConversationsGateway {
       messageType: lastMessage[0].messageType,
     };
 
-    SocketService.emitToFilteredSocket(
+    SocketService.emitToSocket(
       SocketEvents.LOG_MESSAGE,
       participants,
       currentUser as string,

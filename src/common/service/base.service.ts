@@ -46,7 +46,7 @@ export class BaseService<T extends Document> {
     const updated = await this.entity.findByIdAndUpdate(
       id,
       {
-        $set: data,
+        $addToSet: data,
       },
       { new: true },
     );
