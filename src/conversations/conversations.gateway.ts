@@ -35,11 +35,13 @@ import {
 import { TenantDatabaseInterceptor } from 'src/tenant-database/tenant-database.interceptor';
 
 @UseFilters(new SocketExceptionFilter())
-@WebSocketGateway(Number(process.env.PORT), {
+@WebSocketGateway({
+  port: Number(process.env.PORT),
   cors: {
     origin: '*',
-    methods: ['GET', 'POST'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: '*',
   },
 })
 @UseInterceptors(TenantDatabaseInterceptor)

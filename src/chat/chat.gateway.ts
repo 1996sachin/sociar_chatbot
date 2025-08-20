@@ -41,11 +41,13 @@ import { ConversationType } from 'src/conversations/entities/conversation.entity
 const logger = new CustomLogger('Chat Gateway');
 
 @UseFilters(new SocketExceptionFilter())
-@WebSocketGateway(Number(process.env.PORT!), {
+@WebSocketGateway({
+  port: Number(process.env.PORT),
   cors: {
     origin: '*',
-    methods: ['GET', 'POST'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
+    allowedHeaders: '*',
   },
 })
 @UseInterceptors(TenantDatabaseInterceptor)
