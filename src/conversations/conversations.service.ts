@@ -228,10 +228,16 @@ export class ConversationsService extends BaseService<ChatDocument> {
       );
     }
 
+    const lastMsg = `{${userId}} renamed conversation to {${name}}`;
+    await this.update(conversationId, {
+      $set: {
+        lastMessage: lastMsg,
+      },
+    });
     const renameLog = await this.messageService.save({
       conversation: conversation._id,
       sender: userDetails[0]._id,
-      content: `{${userId}} renamed conversation to {${name}}`,
+      content: lastMsg,
       messageStatus: MessageStatus.DELIVERED,
       seenBy: [userId],
       messageType: MessageTypes.LOG,
@@ -290,13 +296,20 @@ export class ConversationsService extends BaseService<ChatDocument> {
       );
 
       // this is log for leaving the conversation
+      const lastMsg = `{${userId}} has left the conversation`;
       const leaveLog = await this.messageService.save({
         conversation: conversation._id,
         sender: mongooseUserId._id,
-        content: `{${userId}} has left the conversation`,
+        content: lastMsg,
         messageStatus: MessageStatus.DELIVERED,
         messageType: MessageTypes.LOG,
         seenBy: [userId],
+      });
+
+      await this.update(conversationId, {
+        $set: {
+          lastMessage: lastMsg,
+        },
       });
 
       return {
@@ -373,6 +386,12 @@ export class ConversationsService extends BaseService<ChatDocument> {
     );
 
     // this is log for leaving the conversation
+    const lastMsg = `{${participantId}} has been removed from the conversation`;
+    await this.update(conversationId, {
+      $set: {
+        lastMessage: lastMsg,
+      },
+    });
     const leaveLog = await this.messageService.save({
       conversation: conversation._id,
       sender: adminUserId._id,

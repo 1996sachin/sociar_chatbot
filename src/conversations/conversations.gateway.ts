@@ -130,14 +130,23 @@ export class ConversationsGateway {
         participants: conversationParticipant,
       },
     });
+    const lastMsg = `{${currentUser}} added {${allNewParticipants.map((newParticipants) => newParticipants.userId)}} to the conversation`;
     const logMsg = await MessageService.save({
       conversation: new Types.ObjectId(conversationId),
       sender: currentUserDetails._id,
-      content: `{${currentUser}} added {${allNewParticipants.map((newParticipants) => newParticipants.userId)}} to the conversation`,
+      content: lastMsg,
       messageType: MessageTypes.LOG,
       messageStatus: MessageStatus.DELIVERED,
     });
 
+    await ConversationsService.update(conversationId, {
+      $addToSet: {
+        participants: conversationParticipant,
+      },
+      $set: {
+        lastMessage: lastMsg,
+      },
+    });
     const payload: SocketPayloads[SocketEvents.LOG_MESSAGE] = {
       conversationId: conversationId,
       group: participants.length > 2 ? true : false,
