@@ -415,6 +415,7 @@ export class ConversationsGateway {
       messageStatus: MessageStatus.SEEN,
       userId: currentUser,
       messageType: lastMessage[0].messageType,
+      name,
     };
 
     SocketService.emitToSocket(SocketEvents.LOG_MESSAGE, participants, payload);

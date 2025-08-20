@@ -24,6 +24,7 @@ export interface SocketPayloads {
     messageStatus: MessageStatus;
     userId: string;
     messageType: MessageTypes;
+    name?: string;
   };
   [SocketEvents.WARNING]: {
     message: string;
