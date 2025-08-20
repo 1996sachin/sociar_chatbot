@@ -3,9 +3,9 @@ import { Document, Types } from 'mongoose';
 
 export type ChatDocument = Conversation & Document;
 
-export enum conversationType {
-  GROUP = "group",
-  PRIVATE = "private"
+export enum ConversationType {
+  GROUP = 'group',
+  PRIVATE = 'private',
 }
 
 @Schema({ timestamps: true })
@@ -26,9 +26,8 @@ export class Conversation {
   @Prop({ type: Types.ObjectId, ref: 'User', required: false })
   createdBy: Types.ObjectId;
 
-  @Prop({ default: conversationType.PRIVATE })
-  conversationType: conversationType
-
+  @Prop({ default: ConversationType.PRIVATE })
+  conversationType: ConversationType;
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);

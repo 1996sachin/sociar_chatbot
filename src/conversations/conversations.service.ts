@@ -7,11 +7,16 @@ import {
 } from '@nestjs/common';
 import { Model } from 'mongoose';
 import { BaseService } from 'src/common/service/base.service';
-import { ChatDocument, Conversation } from './entities/conversation.entity';
+import {
+  ChatDocument,
+  Conversation,
+  ConversationType,
+} from './entities/conversation.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { UsersService } from 'src/users/users.service';
 import { ConversationParticipantService } from 'src/conversation-participant/conversation-participant.service';
 import { MessageService } from 'src/messages/messages.service';
+import { Types } from 'mongoose';
 import {
   MessageStatus,
   MessageTypes,
@@ -186,8 +191,6 @@ export class ConversationsService extends BaseService<ChatDocument> {
     userId: string,
     name: string,
   ) {
-    await new Promise((resolve) => process.nextTick(resolve)); // <- add this
-
     const conversation = await this.find(conversationId);
 
     if (!conversation) {
@@ -196,7 +199,10 @@ export class ConversationsService extends BaseService<ChatDocument> {
       );
     }
 
-    if (conversation.participants.length <= 2) {
+    if (
+      conversation.participants.length <= 2 &&
+      conversation.conversationType === ConversationType.GROUP
+    ) {
       throw new BadRequestException(
         'Conversation must have more than two participants inorder to be a group conversation',
       );
@@ -221,14 +227,20 @@ export class ConversationsService extends BaseService<ChatDocument> {
       messageType: MessageTypes.LOG,
     });
 
+    await this.getRepository().updateOne(
+      {
+        _id: new Types.ObjectId(conversationId),
+      },
+      {
+        $set: { name: name },
+      },
+    );
     return {
       message: 'Converastion renamed successfully',
     };
   }
 
   async leaveConversation(conversationId: string, userId: string) {
-    await new Promise((resolve) => process.nextTick(resolve)); // <- add this
-
     const mongooseUserId = await this.UserService.getRepository().findOne({
       userId: userId,
     });

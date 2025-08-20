@@ -43,11 +43,7 @@ export const addParticipantsSchema = (
 ) =>
   z.object({
     participantIds: z.array(z.string()),
-    conversationId: notFoundCheck({
-      model: ConversationModel,
-      field: '_id',
-      message: 'No conversation with such conversation id found',
-    }),
+    conversationId: isValidObjectId(),
   });
 export type addParticipantsDto = z.infer<
   ReturnType<typeof addParticipantsSchema>
@@ -58,35 +54,31 @@ export const leaveConversationSchema = (
 ) =>
   z.object({
     userId: z.string(),
-    conversationId: notFoundCheck({
-      model: ConversationModel,
-      field: '_id',
-      message: 'No conversation with such conversation id found'
-    })
-  })
-export type leaveConversationDto = z.infer<ReturnType<typeof leaveConversationSchema>>
+    conversationId: isValidObjectId(),
+  });
+export type leaveConversationDto = z.infer<
+  ReturnType<typeof leaveConversationSchema>
+>;
 
-export const removeParticipantSchema = (ConversationModel: Model<ChatDocument>) =>
+export const removeParticipantSchema = (
+  ConversationModel: Model<ChatDocument>,
+) =>
   z.object({
     participantId: z.string(),
-    conversationId: notFoundCheck({
-      model: ConversationModel,
-      field: '_id',
-      message: 'No conversation with such conversation id found'
-    })
-  })
-export type removeParticipantDto = z.infer<ReturnType<typeof removeParticipantSchema>>
+    conversationId: isValidObjectId(),
+  });
+export type removeParticipantDto = z.infer<
+  ReturnType<typeof removeParticipantSchema>
+>;
 
-export const renameConversationSchema = (ConversationModel: Model<ChatDocument>) =>
+export const renameConversationSchema = (
+  ConversationModel: Model<ChatDocument>,
+) =>
   z.object({
-    name: z
-      .string()
-      .min(1, "Conversation name cannot be left empty"),
-    conversationId: notFoundCheck({
-      model: ConversationModel,
-      field: '_id',
-      message: 'No conversation with such id found'
-    })
-  })
+    name: z.string().min(1, 'Conversation name cannot be left empty'),
+    conversationId: isValidObjectId(),
+  });
 
-export type renameConversationDto = z.infer<ReturnType<typeof renameConversationSchema>>
+export type renameConversationDto = z.infer<
+  ReturnType<typeof renameConversationSchema>
+>;

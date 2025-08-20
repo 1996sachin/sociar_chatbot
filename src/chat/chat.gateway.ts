@@ -33,6 +33,7 @@ import {
   SocketPayloads,
 } from 'src/common/constants/socket-events';
 import { TenantDatabaseInterceptor } from 'src/tenant-database/tenant-database.interceptor';
+import { ConversationType } from 'src/conversations/entities/conversation.entity';
 
 const logger = new CustomLogger('Chat Gateway');
 
@@ -164,7 +165,12 @@ export class ChatGateway implements OnGatewayDisconnect {
         data: { conversationId: conversationParticipants[0].conversation },
       };
 
-    const conversation = await ConversationsService.save({});
+    const conversation = await ConversationsService.save({
+      conversationType:
+        allParticipants.length > 2
+          ? ConversationType.GROUP
+          : ConversationType.PRIVATE,
+    });
 
     const conversationParticipant =
       await ConversationParticipantService.saveMany(
