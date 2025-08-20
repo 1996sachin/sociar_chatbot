@@ -27,7 +27,10 @@ import type {
 } from './chat.validator';
 import { SocketExceptionFilter } from 'src/common/helpers/handlers/socket.filter';
 import { CustomLogger } from 'src/config/custom.logger';
-import { MessageStatus } from 'src/messages/entities/message.entity';
+import {
+  MessageStatus,
+  MessageTypes,
+} from 'src/messages/entities/message.entity';
 import {
   SocketEvents,
   SocketPayloads,
@@ -290,6 +293,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       group: conversation.participants.length > 2 ? true : false,
       conversationId: conversationId,
       userId: userId,
+      messageType: MessageTypes.TEXT,
       participants: participants.map(
         (participant) => participant.userDetail[0].userId,
       ),
