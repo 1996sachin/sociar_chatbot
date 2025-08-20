@@ -184,7 +184,9 @@ export class ChatGateway implements OnGatewayDisconnect {
 
     // Update in conversation with participants
     await ConversationsService.update(conversation.id, {
-      participants: conversationParticipant,
+      $addToSet: {
+        participants: conversationParticipant,
+      },
     });
 
     return {
@@ -271,7 +273,9 @@ export class ChatGateway implements OnGatewayDisconnect {
       seenBy: [userId],
     });
     await ConversationsService.update(conversationId, {
-      lastMessage: message,
+      $set: {
+        lastMessage: message,
+      },
     });
 
     // Seen & pull

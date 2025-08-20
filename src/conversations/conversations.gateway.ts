@@ -124,7 +124,9 @@ export class ConversationsGateway {
         })),
       );
     await ConversationsService.update(conversation.id, {
-      participants: conversationParticipant,
+      $addToSet: {
+        participants: conversationParticipant,
+      },
     });
     const logMsg = await MessageService.save({
       conversation: new Types.ObjectId(conversationId),

@@ -43,13 +43,9 @@ export class BaseService<T extends Document> {
   }
 
   async update(id: any, data: any) {
-    const updated = await this.entity.findByIdAndUpdate(
-      id,
-      {
-        $addToSet: data,
-      },
-      { new: true },
-    );
+    const updated = await this.entity.findByIdAndUpdate(id, data, {
+      new: true,
+    });
     return updated;
   }
 
