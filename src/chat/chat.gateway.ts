@@ -57,6 +57,11 @@ export class ChatGateway implements OnGatewayDisconnect {
 
   handleDisconnect(@ConnectedSocket() client: Socket) {
     // Remove user from online pool
+    if (
+      !client.data?.tenantServices ||
+      !client.data?.tenantServices?.SocketStore
+    )
+      return;
     const { SocketStore } = client.data.tenantServices;
     logger.debug(`[disconnected] ${client.id}`);
     SocketStore.remove(client.id);
