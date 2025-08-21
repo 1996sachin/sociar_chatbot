@@ -261,9 +261,10 @@ export class ConversationsService extends BaseService<ChatDocument> {
       throw new WsException('No user with such userId found');
     }
 
-    const conversation = await this.getRepository().findOne({
-      _id: conversationId,
-    });
+    const conversation = await this.getWithCreatedBy(conversationId);
+    if (!conversation) {
+      throw new WsException('No conversation with such userId found');
+    }
 
     if (!conversation) {
       throw new WsException('No conversation with such userId found');
@@ -274,7 +275,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       user: mongooseUserId._id,
     });
 
-    if (!convParticipant) {
+    if (!convParticipant.length) {
       throw new WsException(
         'There is no any conversation participants with such conversation id and user id',
       );
@@ -305,7 +306,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     let nonAdminUser;
-    if (mongooseUserId.id === conversation.createdBy.toString()) {
+    if (mongooseUserId.id === conversation.createdBy._id.toString()) {
       const nonAdminParticipant = conversation.participants.find(
         (participant) => participant.toString() !== convParticipant[0].id,
       );
@@ -335,6 +336,10 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     return {
+      conversation: {
+        ...conversation,
+        ...(nonAdminUser ? { createdBy: nonAdminUser[0].user } : {}),
+      },
       message: 'Conversation left successfully.',
     };
   }
@@ -421,5 +426,25 @@ export class ConversationsService extends BaseService<ChatDocument> {
     return {
       message: 'Participant removed successfully.',
     };
+  }
+  async getWithCreatedBy(conversationId: string) {
+    return (
+      await this.getRepository().aggregate([
+        {
+          $match: {
+            _id: new Types.ObjectId(conversationId),
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'createdBy',
+            foreignField: '_id',
+            as: 'createdBy',
+          },
+        },
+        { $unwind: '$createdBy' },
+      ])
+    )[0];
   }
 }

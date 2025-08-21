@@ -238,7 +238,8 @@ export class ChatGateway implements OnGatewayDisconnect {
     const { conversationId, message } = data;
 
     // Check If conversationId exists
-    const conversation = await ConversationsService.find(conversationId);
+    const conversation =
+      await ConversationsService.getWithCreatedBy(conversationId);
     if (!conversation) throw new WsException('Invalid conversation');
 
     // Get participants & Check If user is part of conversation
@@ -306,6 +307,7 @@ export class ChatGateway implements OnGatewayDisconnect {
       conversationId: conversationId,
       userId: userId,
       messageType: MessageTypes.TEXT,
+      createdBy: conversation.createdBy.userId,
       participants: participants.map(
         (participant) => participant.userDetail[0].userId,
       ),

@@ -26,6 +26,7 @@ export interface SocketPayloads {
     messageType: MessageTypes;
     name?: string;
     createdAt?: string;
+    new?: boolean;
   };
   [SocketEvents.WARNING]: {
     message: string;
@@ -49,5 +50,6 @@ export interface SocketPayloads {
     userId: string;
     participants: string[];
     messageType: MessageTypes.TEXT;
+    createdBy: string;
   };
 }

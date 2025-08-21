@@ -156,6 +156,7 @@ export class ConversationsGateway {
       userId: currentUser,
       messageType: MessageTypes.LOG,
       createdAt: logMsg.createdAt,
+      new: true,
     };
 
     const participantToEmit =
@@ -312,7 +313,10 @@ export class ConversationsGateway {
     if (!participants) throw new WsException('Invalid conversation');
 
     // using the service to leave the conversation
-    await ConversationsService.leaveConversation(conversationId, currentUser);
+    const conversationLeftInfo = await ConversationsService.leaveConversation(
+      conversationId,
+      currentUser,
+    );
 
     const lastMessage = await MessageService.getLastMessage(conversationId);
 
@@ -325,6 +329,7 @@ export class ConversationsGateway {
       userId: currentUser,
       messageType: lastMessage[0].messageType,
       createdAt: lastMessage[0].createdAt,
+      createdBy: conversationLeftInfo.conversation.createdBy.userId,
     };
 
     SocketService.emitToFilteredSocket(
