@@ -42,7 +42,7 @@ export const addParticipantsSchema = (
   ConversationModel: Model<ChatDocument>,
 ) =>
   z.object({
-    participants: z.array(z.string()),
+    participants: z.array(z.coerce.string()),
     conversationId: isValidObjectId(),
   });
 export type addParticipantsDto = z.infer<
