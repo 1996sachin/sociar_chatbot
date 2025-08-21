@@ -76,7 +76,7 @@ export class ConversationsGateway {
 
     // Check If conversationId exists
     const conversation =
-      await ConversationsService.getRepository().findById(conversationId);
+      await ConversationsService.getWithCreatedBy(conversationId);
     if (!conversation)
       throw new WsException('No any conversation with such id found');
     if (conversation.conversationType !== 'group')
@@ -91,6 +91,18 @@ export class ConversationsGateway {
     });
     if (currentParticipants.length <= 0)
       throw new WsException('Invalid conversation');
+
+    const participantsDetails =
+      await ConversationParticipantService.getParticipantsUserDetails(
+        conversationId,
+      );
+    if (!participants || participants.length <= 0)
+      throw new WsException('Invalid conversation');
+
+    const partOfConversation = participantsDetails.find(
+      (participant) => participant.userDetail[0].userId === currentUser,
+    );
+    if (!partOfConversation) throw new WsException('Invalid conversation');
 
     const usersInfo = await UsersService.findWhere({
       userId: { $in: allParticipants },
@@ -147,26 +159,34 @@ export class ConversationsGateway {
         lastMessage: lastMsg,
       },
     });
+
     const payload: SocketPayloads[SocketEvents.LOG_MESSAGE] = {
       conversationId: conversationId,
-      group: participants.length > 2 ? true : false,
-      messageId: logMsg._id,
-      message: logMsg.content,
-      messageStatus: MessageStatus.SEEN,
-      userId: currentUser,
-      messageType: MessageTypes.LOG,
       createdAt: logMsg.createdAt,
+      group: participants.length > 2 ? true : false,
+      message: logMsg.content,
+      messageType: MessageTypes.LOG,
       new: true,
+      userId: currentUser,
+      name: conversation?.name || null,
+      participants: [
+        ...new Set([
+          ...participantsDetails.map(
+            (participantDetail) => participantDetail.userDetail[0].userId,
+          ),
+          ...participants,
+        ]),
+      ],
+      createdBy: conversation.createdBy.userId,
     };
 
-    const participantToEmit =
+    const participantsToEmit =
       await ConversationParticipantService.getParticipantsUserDetails(
         conversationId,
       );
-    if (participants.length <= 0) throw new WsException('Invalid conversation');
     SocketService.emitToSocket(
       SocketEvents.LOG_MESSAGE,
-      participantToEmit,
+      participantsToEmit,
       payload,
     );
 
@@ -320,15 +340,18 @@ export class ConversationsGateway {
 
     const lastMessage = await MessageService.getLastMessage(conversationId);
 
-    const payload = {
+    const payload: SocketPayloads[SocketEvents.LOG_MESSAGE] = {
       conversationId: conversationId,
-      group: participants.length > 2 ? true : false,
-      messageId: lastMessage[0]._id,
-      message: lastMessage[0].content,
-      messageStatus: MessageStatus.SEEN,
-      userId: currentUser,
-      messageType: lastMessage[0].messageType,
       createdAt: lastMessage[0].createdAt,
+      group: participants.length > 2 ? true : false,
+      message: lastMessage[0].content,
+      messageType: lastMessage[0].messageType,
+      new: false,
+      userId: currentUser,
+      name: conversationLeftInfo.conversation?.name,
+      participants: participants
+        .map((participantDetail) => participantDetail.userDetail[0].userId)
+        .filter((item) => item !== currentUser),
       createdBy: conversationLeftInfo.conversation.createdBy.userId,
     };
 
@@ -368,23 +391,28 @@ export class ConversationsGateway {
       );
     if (!participants) throw new WsException('Invalid conversation');
 
-    await ConversationsService.removeParticipant(
-      conversationId,
-      currentUser,
-      participantId,
-    );
+    const removedConversationInfo =
+      await ConversationsService.removeParticipant(
+        conversationId,
+        currentUser,
+        participantId,
+      );
 
     const lastMessage = await MessageService.getLastMessage(conversationId);
 
     const payload: SocketPayloads[SocketEvents.LOG_MESSAGE] = {
       conversationId: conversationId,
-      group: participants.length > 2 ? true : false,
-      messageId: lastMessage[0]._id,
-      message: lastMessage[0].content,
-      messageStatus: MessageStatus.SEEN,
-      userId: currentUser,
-      messageType: lastMessage[0].messageType,
       createdAt: lastMessage[0].createdAt,
+      group: participants.length > 2 ? true : false,
+      message: lastMessage[0].content,
+      messageType: lastMessage[0].messageType,
+      new: false,
+      userId: currentUser,
+      name: removedConversationInfo.conversation?.name,
+      participants: participants
+        .map((participantDetail) => participantDetail.userDetail[0].userId)
+        .filter((item) => item !== participantId),
+      createdBy: removedConversationInfo.conversation?.createdBy.userId,
     };
 
     SocketService.emitToSocket(SocketEvents.LOG_MESSAGE, participants, payload);
@@ -418,24 +446,28 @@ export class ConversationsGateway {
 
     if (!participants) throw new WsException('Invalid conversation');
 
-    await ConversationsService.renameConversation(
-      conversationId,
-      currentUser,
-      name,
-    );
+    const renamedConversationInfo =
+      await ConversationsService.renameConversation(
+        conversationId,
+        currentUser,
+        name,
+      );
 
     const lastMessage = await MessageService.getLastMessage(conversationId);
 
     const payload: SocketPayloads[SocketEvents.LOG_MESSAGE] = {
       conversationId: conversationId,
-      group: participants.length > 2 ? true : false,
-      messageId: lastMessage[0]._id,
-      message: lastMessage[0].content,
-      messageStatus: MessageStatus.SEEN,
-      userId: currentUser,
-      messageType: lastMessage[0].messageType,
-      name,
       createdAt: lastMessage[0].createdAt,
+      group: participants.length > 2 ? true : false,
+      message: lastMessage[0].content,
+      messageType: lastMessage[0].messageType,
+      new: false,
+      userId: currentUser,
+      name,
+      participants: participants.map(
+        (participantDetail) => participantDetail.userDetail[0].userId,
+      ),
+      createdBy: renamedConversationInfo.conversation?.createdBy?.userId,
     };
 
     SocketService.emitToSocket(SocketEvents.LOG_MESSAGE, participants, payload);

@@ -201,7 +201,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
     userId: string,
     name: string,
   ) {
-    const conversation = await this.find(conversationId);
+    const conversation = await this.getWithCreatedBy(conversationId);
 
     if (!conversation) {
       throw new WsException('No conversation with such converasiton id found');
@@ -248,6 +248,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       },
     );
     return {
+      conversation,
       message: 'Converastion renamed successfully',
     };
   }
@@ -351,9 +352,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
   ) {
     await new Promise((resolve) => process.nextTick(resolve)); // <- add this
 
-    const conversation = await this.getRepository().findOne({
-      _id: conversationId,
-    });
+    const conversation = await this.getWithCreatedBy(conversationId);
 
     if (!conversation) {
       throw new WsException('No conversation with such userId found');
@@ -376,7 +375,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
       throw new WsException('No user with such userId found');
     }
 
-    if (!conversation.createdBy.equals(adminUserId?._id as string)) {
+    if (!conversation.createdBy._id.equals(adminUserId?._id as string)) {
       throw new WsException('Only admin can remove participants');
     }
 
@@ -424,6 +423,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     return {
+      conversation,
       message: 'Participant removed successfully.',
     };
   }

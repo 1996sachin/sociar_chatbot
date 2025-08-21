@@ -18,15 +18,16 @@ export interface SocketPayloads {
   };
   [SocketEvents.LOG_MESSAGE]: {
     conversationId: string;
+    createdAt: string;
     group: boolean;
-    messageId: string;
     message: string;
-    messageStatus: MessageStatus;
-    userId: string;
     messageType: MessageTypes;
-    name?: string;
-    createdAt?: string;
-    new?: boolean;
+    new: boolean;
+    userId: string;
+    name: string;
+    participants: string[];
+    createdBy: string;
+    // messageStatus: MessageStatus;
   };
   [SocketEvents.WARNING]: {
     message: string;
