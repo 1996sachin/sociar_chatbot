@@ -248,6 +248,11 @@ export class ChatGateway implements OnGatewayDisconnect {
       );
     if (!participants) throw new WsException('Invalid conversation');
 
+    const partOfConversation = participants.find(
+      (participant) => participant.userDetail[0].userId === userId,
+    );
+    if (!partOfConversation) throw new WsException('Invalid conversation');
+
     // Code for making seen if user directly sends message without seen
     const lastMessage = await MessageService.getRepository()
       .findOne({ conversation: new Types.ObjectId(conversationId) })
