@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -21,6 +20,7 @@ import {
   MessageStatus,
   MessageTypes,
 } from 'src/messages/entities/message.entity';
+import { WsException } from '@nestjs/websockets';
 
 @Injectable()
 export class ConversationsService extends BaseService<ChatDocument> {
@@ -204,16 +204,14 @@ export class ConversationsService extends BaseService<ChatDocument> {
     const conversation = await this.find(conversationId);
 
     if (!conversation) {
-      throw new BadRequestException(
-        'No conversation with such converasiton id found',
-      );
+      throw new WsException('No conversation with such converasiton id found');
     }
 
     if (
       conversation.participants.length <= 2 &&
       conversation.conversationType === ConversationType.GROUP
     ) {
-      throw new BadRequestException(
+      throw new WsException(
         'Conversation must have more than two participants inorder to be a group conversation',
       );
     }
@@ -223,9 +221,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     if (!userDetails) {
-      throw new BadRequestException(
-        'No such user is part of this conversation',
-      );
+      throw new WsException('No such user is part of this conversation');
     }
 
     const lastMsg = `{${userId}} renamed conversation to {${name}}`;
@@ -262,7 +258,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     if (!mongooseUserId) {
-      throw new BadRequestException('No user with such userId found');
+      throw new WsException('No user with such userId found');
     }
 
     const conversation = await this.getRepository().findOne({
@@ -270,7 +266,7 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     if (!conversation) {
-      throw new BadRequestException('No conversation with such userId found');
+      throw new WsException('No conversation with such userId found');
     }
 
     const convParticipant = await this.conversationPService.findWhere({
@@ -279,47 +275,68 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     if (!convParticipant) {
-      throw new BadRequestException(
+      throw new WsException(
         'There is no any conversation participants with such conversation id and user id',
       );
     }
 
-    if (conversation.conversationType === 'group') {
-      await this.conversationPService.delete(convParticipant[0]._id);
-      await this.getRepository().updateOne(
-        {
-          _id: conversation._id,
-        },
-        {
-          $pull: { participants: convParticipant[0]._id },
-        },
+    if (conversation.conversationType !== ConversationType.GROUP)
+      throw new WsException('User cannot leave peer to peer conversation');
+    //TODO: soft delete
+    await this.conversationPService.delete(convParticipant[0]._id);
+    await this.getRepository().updateOne(
+      {
+        _id: conversation._id,
+      },
+      {
+        $pull: { participants: convParticipant[0]._id },
+      },
+    );
+
+    // this is log for leaving the conversation
+    const lastMsg = `{${userId}} has left the conversation`;
+    const leaveLog = await this.messageService.save({
+      conversation: conversation._id,
+      sender: mongooseUserId._id,
+      content: lastMsg,
+      messageStatus: MessageStatus.DELIVERED,
+      messageType: MessageTypes.LOG,
+      seenBy: [userId],
+    });
+
+    let nonAdminUser;
+    if (mongooseUserId.id === conversation.createdBy.toString()) {
+      const nonAdminParticipant = conversation.participants.find(
+        (participant) => participant.toString() !== convParticipant[0].id,
       );
-
-      // this is log for leaving the conversation
-      const lastMsg = `{${userId}} has left the conversation`;
-      const leaveLog = await this.messageService.save({
-        conversation: conversation._id,
-        sender: mongooseUserId._id,
-        content: lastMsg,
-        messageStatus: MessageStatus.DELIVERED,
-        messageType: MessageTypes.LOG,
-        seenBy: [userId],
-      });
-
-      await this.update(conversationId, {
-        $set: {
-          lastMessage: lastMsg,
+      nonAdminUser = await this.conversationPService.getRepository().aggregate([
+        {
+          $match: {
+            _id: nonAdminParticipant,
+          },
         },
-      });
-
-      return {
-        message: 'Conversation left successfully.',
-      };
-    } else {
-      throw new BadRequestException(
-        'User cannot leave peer to peer conversation',
-      );
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        { $unwind: '$user' },
+      ]);
     }
+
+    await this.update(conversationId, {
+      $set: {
+        lastMessage: lastMsg,
+        ...(nonAdminUser ? { createdBy: nonAdminUser[0].user._id } : {}),
+      },
+    });
+
+    return {
+      message: 'Conversation left successfully.',
+    };
   }
 
   async removeParticipant(
@@ -334,11 +351,11 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     if (!conversation) {
-      throw new BadRequestException('No conversation with such userId found');
+      throw new WsException('No conversation with such userId found');
     }
 
     if (conversation.conversationType !== 'group') {
-      throw new BadRequestException(
+      throw new WsException(
         'Cannot remove participant from the private conversation',
       );
     }
@@ -351,11 +368,11 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     if (!participantUserId || !adminUserId) {
-      throw new BadRequestException('No user with such userId found');
+      throw new WsException('No user with such userId found');
     }
 
     if (!conversation.createdBy.equals(adminUserId?._id as string)) {
-      throw new BadRequestException('Only admin can remove participants');
+      throw new WsException('Only admin can remove participants');
     }
 
     const convParticipant = await this.conversationPService.findWhere({
@@ -364,13 +381,13 @@ export class ConversationsService extends BaseService<ChatDocument> {
     });
 
     if (!convParticipant) {
-      throw new BadRequestException(
+      throw new WsException(
         'There is no any conversation participants with such conversation id and user id',
       );
     }
 
     if (userId === participantId) {
-      throw new BadRequestException(
+      throw new WsException(
         'Admin cannot remove themselve from the conversation',
       );
     }
