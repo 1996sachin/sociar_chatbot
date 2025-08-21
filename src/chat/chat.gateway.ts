@@ -72,13 +72,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody(
       new ZodValidationPipe(
         initializeChatSchema,
-        (error) =>
-          new WsException({
-            event: SocketEvents.ERROR,
-            data: {
-              error: error.format(),
-            } as SocketPayloads[SocketEvents.ERROR]['data'],
-          }),
+        (error) => new WsException(error),
       ),
     )
     data: InitializeChatDto,
@@ -122,13 +116,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody(
       new ZodValidationPipe(
         createConversationSchema,
-        (error) =>
-          new WsException({
-            event: SocketEvents.ERROR,
-            data: {
-              error: error.format(),
-            } as SocketPayloads[SocketEvents.ERROR]['data'],
-          }),
+        (error) => new WsException(error),
       ),
     )
     data: CreateConversationDto,
@@ -210,13 +198,7 @@ export class ChatGateway implements OnGatewayDisconnect {
     @MessageBody(
       new ZodValidationPipe(
         sendMessageSchema,
-        (error) =>
-          new WsException({
-            event: SocketEvents.ERROR,
-            data: {
-              error: error.format(),
-            } as SocketPayloads[SocketEvents.ERROR]['data'],
-          }),
+        (error) => new WsException(error),
       ),
     )
     data: SendMessageDto,

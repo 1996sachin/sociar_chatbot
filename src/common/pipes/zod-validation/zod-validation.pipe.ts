@@ -4,7 +4,7 @@ import { ZodError, ZodSchema } from 'zod';
 export class ZodValidationPipe implements PipeTransform {
   constructor(
     private readonly schema: ZodSchema,
-    private readonly exceptionFactory?: (errors: ZodError) => unknown,
+    private readonly exceptionFactory: (errors: any) => unknown,
   ) {}
 
   transform(value: unknown) {
@@ -12,10 +12,8 @@ export class ZodValidationPipe implements PipeTransform {
       const parsedValue = this.schema.parse(value);
       return parsedValue;
     } catch (err) {
-      if (err instanceof ZodError && this.exceptionFactory) {
-        throw this.exceptionFactory(err);
-      }
-      throw err;
+      const messages = err?.issues[0]?.message || err;
+      throw this.exceptionFactory(messages);
     }
   }
 }
