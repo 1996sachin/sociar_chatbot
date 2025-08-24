@@ -163,12 +163,12 @@ export class ConversationsGateway {
     const payload: SocketPayloads[SocketEvents.LOG_MESSAGE] = {
       conversationId: conversationId,
       createdAt: logMsg.createdAt,
-      group: participants.length > 2 ? true : false,
+      group: conversation.participants.length > 2 ? true : false,
       message: logMsg.content,
       messageType: MessageTypes.LOG,
       new: true,
       userId: currentUser,
-      name: conversation?.name || null,
+      name: conversation?.name ?? null,
       participants: [
         ...new Set([
           ...participantsDetails.map(
@@ -348,7 +348,7 @@ export class ConversationsGateway {
       messageType: lastMessage[0].messageType,
       new: false,
       userId: currentUser,
-      name: conversationLeftInfo.conversation?.name,
+      name: conversationLeftInfo.conversation?.name ?? null,
       participants: participants
         .map((participantDetail) => participantDetail.userDetail[0].userId)
         .filter((item) => item !== currentUser),
@@ -408,7 +408,7 @@ export class ConversationsGateway {
       messageType: lastMessage[0].messageType,
       new: false,
       userId: currentUser,
-      name: removedConversationInfo.conversation?.name,
+      name: removedConversationInfo.conversation?.name ?? null,
       participants: participants
         .map((participantDetail) => participantDetail.userDetail[0].userId)
         .filter((item) => item !== participantId),
