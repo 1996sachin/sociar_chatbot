@@ -1,0 +1,41 @@
+services:
+  chroma:
+    image: chromadb/chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/data
+    networks:
+      - chat
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7
+    container_name: mongo
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - chat
+    restart: unless-stopped
+  chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chat-bot
+    ports:
+      - "3000:3000"
+    networks:
+      - chat
+    depends_on:
+      - mongodb
+      - chroma
+
+networks:
+  chat:
+    driver: bridge
+
+volumes:
+  chroma_data:
+  mongo_data:
