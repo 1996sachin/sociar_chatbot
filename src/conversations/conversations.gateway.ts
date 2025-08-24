@@ -174,7 +174,7 @@ export class ConversationsGateway {
           ...participantsDetails.map(
             (participantDetail) => participantDetail.userDetail[0].userId,
           ),
-          ...participants,
+          ...participants.map((participant) => participant.toString()),
         ]),
       ],
       createdBy: conversation.createdBy.userId,
