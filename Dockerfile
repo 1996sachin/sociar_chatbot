@@ -11,11 +11,12 @@ RUN npm install
 # Copy source code
 COPY . .
 
+COPY .env.sample .env
 
 RUN npm run build
 
 # Expose the port your Node app listens to
-EXPOSE 3000
+EXPOSE 3030
 
 # Start app using PM2
 CMD ["npm", "run", "start"]

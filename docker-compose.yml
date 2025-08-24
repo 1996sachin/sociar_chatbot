@@ -25,7 +25,7 @@ services:
       dockerfile: Dockerfile
     container_name: chat-bot
     ports:
-      - "3000:3000"
+      - "3030:3030"
     networks:
       - chat
     depends_on:
