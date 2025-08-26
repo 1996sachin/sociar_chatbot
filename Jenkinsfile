@@ -2,10 +2,18 @@ pipeline {
     agent any
 
     environment {
-        GITHUB_TOKEN = credentials('my-github-token') // Jenkins stored secret
+        GITHUB_TOKEN = credentials('my-github-token')
     }
 
     stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'maksud',
+                    url: 'https://github.com/1996sachin/sociar_chatbot.git',
+                    credentialsId: 'my-github-token'
+            }
+        }
+
         stage('Clean old project files') {
             steps {
                 dir('./sociair-chat-bot') {
