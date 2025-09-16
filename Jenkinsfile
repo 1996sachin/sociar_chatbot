@@ -10,7 +10,7 @@ pipeline {
             steps {
                 git branch: 'maksud',
                     url: 'https://github.com/1996sachin/sociar_chatbot.git',
-                    credentialsId: 'my-github-token'
+                    credentialsId: 'github-pat'
             }
         }
 
